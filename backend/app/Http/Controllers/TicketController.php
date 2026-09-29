@@ -55,6 +55,66 @@ class TicketController extends Controller
             'note' => $note,
         ]);
     }
+
+    /** Samakan format lokasi agar "Kelas 412" == "Ruang 412". */
+    public static function normalizeLocation(string $value): string
+    {
+        $t = mb_strtolower($value);
+        $t = preg_replace('/^(ruang|ruangan|kelas|room|r\.?)\s+/u', '', $t);
+        $t = preg_replace('/[^a-z0-9]+/u', ' ', $t);
+        return trim($t);
+    }
+
+    /** Kategori lama disetarakan ke kategori rinci (untuk data lama saja). */
+    protected static array $legacyCategoryEquivalents = [
+        'Elektronik / Proyektor' => ['Proyektor'],
+        'Kelistrikan' => ['Lampu / Penerangan', 'Stopkontak / Saklar', 'Korsleting / Listrik Padam'],
+        'Pipa / Air' => ['Kebocoran Pipa', 'Keran / Wastafel', 'Toilet / Kloset', 'Saluran Mampet'],
+        'Furniture / Meubeler' => ['Kursi', 'Meja', 'Pintu / Jendela / Kunci', 'Papan Tulis'],
+    ];
+
+    public static function isSameCategory(string $a, string $b): bool
+    {
+        if ($a === $b) {
+            return true;
+        }
+        return in_array($b, self::$legacyCategoryEquivalents[$a] ?? [])
+            || in_array($a, self::$legacyCategoryEquivalents[$b] ?? []);
+    }
+
+    /**
+     * Terapkan perubahan status ke laporan identik lain yang masih aktif
+     * (lokasi + kategori persis sama). Mengembalikan jumlah tiket yang ikut.
+     */
+    protected function cascadeIdentical(Ticket $ticket, string $status, $actorId, ?string $notes, array $excludeIds = []): int
+    {
+        $siblings = Ticket::where('id', '!=', $ticket->id)
+            ->whereIn('status', ['pending', 'in_progress'])
+            ->whereNotIn('id', $excludeIds)
+            ->get()
+            ->filter(fn ($t) =>
+                self::normalizeLocation($t->location) === self::normalizeLocation($ticket->location)
+                && self::isSameCategory($t->category, $ticket->category)
+            );
+
+        foreach ($siblings as $sibling) {
+            $old = $sibling->status;
+            $sibling->status = $status;
+            if ($notes !== null) {
+                $sibling->admin_notes = $notes;
+            }
+            $sibling->save();
+            $this->logHistory(
+                $sibling,
+                $actorId,
+                $old,
+                $status,
+                "Otomatis mengikuti tiket #{$ticket->id} (laporan identik)"
+            );
+        }
+
+        return $siblings->count();
+    }
     public function index(Request $request)
     {
         $user = $request->user();
@@ -298,6 +358,57 @@ class TicketController extends Controller
         ]);
     }
 
+    /**
+     * Ubah banyak tiket sekaligus (khusus admin). Dipakai misal untuk
+     * menyelesaikan beberapa laporan identik secara berbarengan.
+     */
+    public function bulkUpdate(Request $request)
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Hanya admin'], 403);
+        }
+
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1|max:100',
+            'ids.*' => 'integer|exists:tickets,id',
+            'status' => 'sometimes|in:pending,in_progress,resolved',
+            'admin_notes' => 'nullable|string',
+            'priority' => 'sometimes|in:ringan,mendesak,darurat',
+        ]);
+
+        $changes = collect($validated)->only(['status', 'admin_notes', 'priority'])->toArray();
+        if (empty($changes)) {
+            return response()->json(['message' => 'Tidak ada perubahan yang diminta'], 422);
+        }
+
+        $updated = 0;
+        $tickets = Ticket::whereIn('id', $validated['ids'])->get();
+        foreach ($tickets as $ticket) {
+            $oldStatus = $ticket->status;
+            $ticket->update($changes);
+            if (($changes['status'] ?? null) && $changes['status'] !== $oldStatus) {
+                $this->logHistory(
+                    $ticket,
+                    $request->user()->id,
+                    $oldStatus,
+                    $changes['status'],
+                    $changes['admin_notes'] ?? null
+                );
+                // Laporan identik di luar pilihan ikut berubah otomatis.
+                $updated += $this->cascadeIdentical(
+                    $ticket,
+                    $changes['status'],
+                    $request->user()->id,
+                    $changes['admin_notes'] ?? null,
+                    $validated['ids']
+                );
+            }
+            $updated++;
+        }
+
+        return response()->json(['updated' => $updated]);
+    }
+
     public function update(Request $request, $id)
     {
         $ticket = Ticket::findOrFail($id);
@@ -322,6 +433,19 @@ class TicketController extends Controller
                 $validated['status'],
                 $validated['admin_notes'] ?? null
             );
+
+            // Laporan identik lain yang masih aktif ikut berubah otomatis.
+            $followed = $this->cascadeIdentical(
+                $ticket,
+                $validated['status'],
+                $user->id,
+                $validated['admin_notes'] ?? null
+            );
+
+            return response()->json(array_merge(
+                $ticket->toArray(),
+                ['auto_followed' => $followed]
+            ));
         }
 
         return response()->json($ticket);

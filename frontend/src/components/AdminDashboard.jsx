@@ -51,6 +51,10 @@ export default function AdminDashboard() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [insight, setInsight] = useState(null);
+  const [checkedIds, setCheckedIds] = useState([]);
+  const [bulkStatus, setBulkStatus] = useState('resolved');
+  const [bulkNotes, setBulkNotes] = useState('');
+  const [bulkApplying, setBulkApplying] = useState(false);
 
   const loadTickets = async () => {
     try {
@@ -118,8 +122,13 @@ export default function AdminDashboard() {
     if (!selected) return;
     setSaving(true);
     try {
-      await tickets.update(selected.id, { status: chosenStatus, admin_notes: adminNotes, priority: chosenPriority });
-      toast.success(`Tiket ${selected.location} diperbarui`);
+      const res = await tickets.update(selected.id, { status: chosenStatus, admin_notes: adminNotes, priority: chosenPriority });
+      const followed = res.data.auto_followed || 0;
+      toast.success(
+        followed > 0
+          ? `Tiket diperbarui. ${followed} laporan identik ikut berubah otomatis`
+          : `Tiket ${selected.location} diperbarui`
+      );
       setSelected(null);
       setLoading(true);
       await loadTickets();
@@ -140,6 +149,37 @@ export default function AdminDashboard() {
         isDuplicateReport(selected, t)
     );
   }, [allTickets, selected]);
+
+  const toggleCheck = (id) => {
+    setCheckedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const toggleCheckAll = () => {
+    setCheckedIds((prev) =>
+      prev.length === filtered.length ? [] : filtered.map((t) => t.id)
+    );
+  };
+
+  const handleBulkApply = async () => {
+    if (checkedIds.length === 0) return;
+    setBulkApplying(true);
+    try {
+      const res = await tickets.bulkUpdate({
+        ids: checkedIds,
+        status: bulkStatus,
+        admin_notes: bulkNotes.trim() || undefined,
+      });
+      toast.success(`${res.data.updated} tiket berhasil diperbarui`);
+      setCheckedIds([]);
+      setBulkNotes('');
+      setLoading(true);
+      await loadTickets();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Gagal menerapkan aksi massal');
+    } finally {
+      setBulkApplying(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -287,6 +327,48 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* Aksi massal */}
+      {checkedIds.length > 0 && (
+        <div className="mb-4 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm lg:flex-row lg:items-center">
+          <p className="text-sm font-semibold text-red-900">
+            {checkedIds.length} tiket ditandai
+          </p>
+          <select
+            value={bulkStatus}
+            onChange={(e) => setBulkStatus(e.target.value)}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-red-600 focus:outline-none"
+          >
+            {STATUS_TABS.filter((s) => s.key !== 'all').map(({ key, label }) => (
+              <option key={key} value={key}>
+                Ubah ke {label}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            value={bulkNotes}
+            onChange={(e) => setBulkNotes(e.target.value)}
+            placeholder="Catatan untuk semua tiket (opsional)"
+            className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleBulkApply}
+              disabled={bulkApplying}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+            >
+              {bulkApplying ? 'Menerapkan...' : 'Terapkan'}
+            </button>
+            <button
+              onClick={() => setCheckedIds([])}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              Batal
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tabel */}
       {filtered.length === 0 ? (
         <EmptyState
@@ -296,9 +378,18 @@ export default function AdminDashboard() {
       ) : (
         <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <table className="w-full min-w-[800px] text-left text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/70 text-xs uppercase tracking-wide text-gray-500">
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={filtered.length > 0 && checkedIds.length === filtered.length}
+                      onChange={toggleCheckAll}
+                      title="Tandai semua"
+                      className="h-4 w-4 accent-red-600"
+                    />
+                  </th>
                   <th className="px-5 py-3 font-semibold">Laporan</th>
                   <th className="px-5 py-3 font-semibold">Pelapor</th>
                   <th className="px-5 py-3 font-semibold">Tanggal</th>
@@ -309,6 +400,15 @@ export default function AdminDashboard() {
               <tbody className="divide-y divide-gray-100">
                 {filtered.map((t) => (
                   <tr key={t.id} className="transition hover:bg-gray-50/70">
+                    <td className="px-4 py-3.5">
+                      <input
+                        type="checkbox"
+                        checked={checkedIds.includes(t.id)}
+                        onChange={() => toggleCheck(t.id)}
+                        title={`Tandai tiket #${t.id}`}
+                        className="h-4 w-4 accent-red-600"
+                      />
+                    </td>
                     <td className="px-5 py-3.5">
                       <p className="font-semibold text-gray-900">{t.location}</p>
                       <p className="mt-0.5 max-w-xs truncate text-xs text-gray-500">
@@ -441,7 +541,7 @@ export default function AdminDashboard() {
                   ))}
                 </ul>
                 <p className="mt-2 text-xs text-sky-700">
-                  Pertimbangkan menutup salah satunya dengan catatan yang sama bila memang masalah identik.
+                  Tiket di bawah otomatis ikut berubah saat status tiket ini disimpan. Tidak perlu dikerjakan satu per satu.
                 </p>
               </div>
             )}

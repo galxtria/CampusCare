@@ -21,6 +21,7 @@ export default function ReportForm() {
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState([]);
   const [supporting, setSupporting] = useState(null);
+  const [ackDifferent, setAckDifferent] = useState(false);
 
   useEffect(() => {
     tickets
@@ -41,6 +42,11 @@ export default function ReportForm() {
         isDuplicateReport({ location: currentLocation, category: form.category }, t)
     );
   }, [active, currentLocation, form.category]);
+
+  // Konfirmasi "masalah berbeda" harus diulang tiap ganti lokasi/kategori.
+  useEffect(() => {
+    setAckDifferent(false);
+  }, [currentLocation, form.category]);
 
   const handleSupport = async (id) => {
     setSupporting(id);
@@ -84,6 +90,10 @@ export default function ReportForm() {
     e.preventDefault();
     if (!currentLocation.trim() || !form.category || !form.description.trim()) {
       toast.error('Lengkapi lokasi, kategori, dan deskripsi terlebih dahulu');
+      return;
+    }
+    if (duplicates.length > 0 && !ackDifferent) {
+      toast.error('Centang konfirmasi bahwa ini masalah berbeda, atau dukung laporan yang ada');
       return;
     }
     setLoading(true);
@@ -197,8 +207,17 @@ export default function ReportForm() {
                 ))}
               </ul>
               <p className="mt-2 text-xs text-amber-700">
-                Dukung laporan yang ada agar tidak duplikat, atau tetap kirim laporan baru di bawah jika ini masalah berbeda.
+                Dukung laporan yang ada agar tidak duplikat, atau centang di bawah bila ini masalah berbeda lalu kirim laporan baru.
               </p>
+              <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg bg-white/70 px-3 py-2 text-xs font-medium text-amber-900">
+                <input
+                  type="checkbox"
+                  checked={ackDifferent}
+                  onChange={(e) => setAckDifferent(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-amber-600"
+                />
+                Saya yakin ini masalah berbeda dari laporan di atas
+              </label>
             </div>
           )}
 
@@ -261,11 +280,11 @@ export default function ReportForm() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (duplicates.length > 0 && !ackDifferent)}
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60"
           >
             {loading ? <Spinner size={18} /> : <SendHorizonal size={18} />}
-            {loading ? 'Mengirim laporan...' : 'Kirim Laporan'}
+            {loading ? 'Mengirim laporan...' : duplicates.length > 0 && !ackDifferent ? 'Kunci: konfirmasi dulu di atas' : 'Kirim Laporan'}
           </button>
         </div>
       </form>

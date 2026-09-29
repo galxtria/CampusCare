@@ -15,7 +15,6 @@ const USER_NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/report/new', label: 'Laporkan Kerusakan', icon: FilePlus2 },
   { to: '/my-reports', label: 'Laporan Saya', icon: ClipboardList },
-  { to: '/notifications', label: 'Notifikasi', icon: FilePlus2 },
 ];
 
 const ADMIN_NAV = [

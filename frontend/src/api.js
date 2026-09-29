@@ -26,6 +26,7 @@ export const tickets = {
   }),
   get: (id) => API.get(`/tickets/${id}`),
   update: (id, data) => API.put(`/tickets/${id}`, data),
+  bulkUpdate: (data) => API.put('/tickets/bulk', data),
   delete: (id) => API.delete(`/tickets/${id}`),
   support: (id) => API.post(`/tickets/${id}/support`),
   unsupport: (id) => API.delete(`/tickets/${id}/support`),

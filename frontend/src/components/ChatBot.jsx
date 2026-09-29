@@ -69,8 +69,8 @@ PENGETAHUAN RESMI CAMPUSCARE:
    - Belum punya akun / lupa password: hubungi admin sarpras kampus untuk bantuan (akun dibuat oleh admin, tidak ada registrasi mandiri).
    - Laporan bisa dihapus via tombol hapus di "Laporan Saya" (hapus permanen).
    - Setiap tiket bisa didiskusikan via kolom "Diskusi dengan teknisi" di halaman detail.
-   - Setelah tiket Selesai, berikan rating bintang 1-5 + ulasan agar kualitas layanan terpantau.
-   - Notifikasi: aktifkan izin notifikasi browser di menu Notifikasi agar dapat update otomatis saat status laporan berubah (Menunggu → Diproses → Selesai).
+   - Setelah tiket Selesai, berikan rating bintang 1 sampai 5 + ulasan agar kualitas layanan terpantau.
+   - Pantau progres di menu "Laporan Saya" atau ringkasan Dashboard. Perubahan status terlihat di kolom status dan Riwayat penanganan tiap tiket.
    - Export rekap PDF dan QR code ruangan adalah fitur khusus admin.`;
 
 export default function ChatBot() {

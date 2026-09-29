@@ -62,25 +62,6 @@ export const generateQRCode = async (text) => {
   }
 };
 
-export const requestNotificationPermission = async () => {
-  if (!('Notification' in window)) return false;
-  if (Notification.permission === 'granted') return true;
-  if (Notification.permission !== 'denied') {
-    const perm = await Notification.requestPermission();
-    return perm === 'granted';
-  }
-  return false;
-};
-
-export const sendNotification = (title, options = {}) => {
-  if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification(title, {
-      icon: '/logo192.png',
-      ...options,
-    });
-  }
-};
-
 export const exportPDF = (html, filename) => {
   const element = document.createElement('div');
   element.innerHTML = html;
