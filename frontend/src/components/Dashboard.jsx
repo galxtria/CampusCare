@@ -130,7 +130,7 @@ export default function Dashboard({ user }) {
                 Fasilitas yang Sudah Dilaporkan
               </h2>
               <p className="text-xs text-gray-500">
-                Cek di sini dulu sebelum melapor — dukung laporan yang ada agar tidak duplikat
+                Cek di sini dulu sebelum melapor. Dukung laporan yang ada agar tidak duplikat.
               </p>
             </div>
           </div>

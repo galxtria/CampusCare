@@ -2,13 +2,15 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Plus, Trash2, Eye, MapPin } from 'lucide-react';
 import { tickets } from '../api';
-import { CATEGORIES, STORAGE_URL, formatDate } from '../constants';
+import { CATEGORIES, STORAGE_URL, formatDate, isSameCategory } from '../constants';
 import { useToast } from './ui/Toast';
 import PageHeader from './ui/PageHeader';
 import StatusBadge from './ui/StatusBadge';
 import PriorityBadge from './ui/PriorityBadge';
 import SLABadge from './ui/SLABadge';
 import TicketTimeline from './ui/TicketTimeline';
+import TicketComments from './ui/TicketComments';
+import TicketRating from './ui/TicketRating';
 import EmptyState from './ui/EmptyState';
 import Spinner from './ui/Spinner';
 import Modal from './ui/Modal';
@@ -65,7 +67,7 @@ export default function MyReports() {
     const q = search.trim().toLowerCase();
     return data.filter((t) => {
       if (statusFilter !== 'all' && t.status !== statusFilter) return false;
-      if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
+      if (categoryFilter !== 'all' && !isSameCategory(t.category, categoryFilter)) return false;
       if (q && !`${t.location} ${t.description}`.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -238,11 +240,6 @@ export default function MyReports() {
                   {selected.supports_count} dukungan
                 </span>
               )}
-              {selected.duplicate_of && (
-                <span className="rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-800">
-                  Duplikat #{selected.duplicate_of} — mengikuti tiket utama
-                </span>
-              )}
               <span className="inline-flex items-center gap-1 text-xs text-gray-400">
                 <MapPin size={13} />
                 {formatDate(selected.created_at)}
@@ -275,6 +272,19 @@ export default function MyReports() {
               </p>
               <TicketTimeline histories={selected.histories} />
             </div>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Diskusi dengan teknisi
+              </p>
+              <TicketComments ticketId={selected.id} initial={selected.comments || []} />
+            </div>
+            <TicketRating
+              ticket={selected}
+              onRated={(updated) => {
+                setSelected(updated);
+                setData((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
+              }}
+            />
           </div>
         )}
       </Modal>

@@ -57,7 +57,7 @@ export default function QRGenerator() {
               onChange={(e) => setSelectedRoom(e.target.value)}
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/15"
             >
-              <option value="">— Pilih ruangan —</option>
+              <option value="">Pilih ruangan</option>
               {ROOMS.map((r) => (
                 <option key={r} value={r}>
                   {r}

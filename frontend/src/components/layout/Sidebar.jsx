@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   LogOut,
   X,
+  Users,
 } from 'lucide-react';
 import Logo from '../ui/Logo';
 
@@ -21,6 +22,7 @@ const ADMIN_NAV = [
   { to: '/admin', label: 'Kelola Tiket', icon: ShieldCheck, end: true },
   { to: '/admin/export', label: 'Export Laporan', icon: FilePlus2 },
   { to: '/admin/qr', label: 'QR Code', icon: FilePlus2 },
+  { to: '/admin/users', label: 'Kelola Pengguna', icon: Users },
 ];
 
 function NavContent({ items, onNavigate }) {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ImagePlus, X, SendHorizonal, TriangleAlert, ThumbsUp } from 'lucide-react';
 import { tickets } from '../api';
-import { CATEGORIES, ROOMS, OTHER_LOCATION, STATUS_LABELS, PRIORITY_LABELS, PRIORITY_SLA_DAYS } from '../constants';
+import { CATEGORIES, ROOMS, OTHER_LOCATION, STATUS_LABELS } from '../constants';
 import { isDuplicateReport, detectPriority } from '../utils/helpers';
 import { useToast } from './ui/Toast';
 import PageHeader from './ui/PageHeader';
@@ -16,7 +16,6 @@ export default function ReportForm() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ location: '', category: '', description: '' });
   const [room, setRoom] = useState('');
-  const [priority, setPriority] = useState('ringan');
   const [photo, setPhoto] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -32,7 +31,7 @@ export default function ReportForm() {
 
   const currentLocation = room === OTHER_LOCATION ? form.location : room;
 
-  // Laporan aktif lain dengan lokasi + kategori sama (maks 14 hari terakhir).
+  // Laporan aktif lain dengan lokasi + kategori persis sama (maks 14 hari terakhir).
   const duplicates = useMemo(() => {
     if (!currentLocation.trim() || !form.category) return [];
     const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
@@ -54,7 +53,7 @@ export default function ReportForm() {
             : t
         )
       );
-      toast.success('Dukungan tercatat — Anda tidak perlu membuat laporan baru');
+      toast.success('Dukungan tercatat. Anda tidak perlu membuat laporan baru');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Gagal mendukung laporan');
     } finally {
@@ -93,7 +92,8 @@ export default function ReportForm() {
     formData.append('location', currentLocation.trim());
     formData.append('category', form.category);
     formData.append('description', form.description.trim());
-    formData.append('priority', priority);
+    // Prioritas ditentukan otomatis oleh sistem dari isi laporan.
+    formData.append('priority', detectPriority(`${currentLocation} ${form.description}`));
     if (photo) formData.append('photo', photo);
 
     try {
@@ -125,7 +125,7 @@ export default function ReportForm() {
               onChange={(e) => setRoom(e.target.value)}
               className={inputClasses}
             >
-              <option value="">— Pilih lokasi —</option>
+              <option value="">Pilih lokasi</option>
               {ROOMS.map((r) => (
                 <option key={r} value={r}>
                   {r}
@@ -150,7 +150,7 @@ export default function ReportForm() {
               Kategori Kerusakan <span className="text-red-600">*</span>
             </label>
             <select name="category" value={form.category} onChange={handleChange} className={inputClasses}>
-              <option value="">— Pilih kategori —</option>
+              <option value="">Pilih kategori</option>
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -159,42 +159,11 @@ export default function ReportForm() {
             </select>
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-              Prioritas <span className="text-red-600">*</span>
-            </label>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              className={inputClasses}
-            >
-              {Object.entries(PRIORITY_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label} — target {PRIORITY_SLA_DAYS[key]} hari
-                </option>
-              ))}
-            </select>
-            {(() => {
-              const guessed = detectPriority(`${currentLocation} ${form.description}`);
-              return (
-                guessed !== priority && (
-                  <button
-                    type="button"
-                    onClick={() => setPriority(guessed)}
-                    className="mt-1.5 text-xs font-semibold text-red-600 hover:text-red-700"
-                  >
-                    Sistem mendeteksi ini prioritas {PRIORITY_LABELS[guessed]} — klik untuk pakai
-                  </button>
-                )
-              );
-            })()}
-          </div>
-
           {duplicates.length > 0 && (
             <div className="rounded-xl bg-amber-50 p-4 ring-1 ring-inset ring-amber-600/20">
               <p className="flex items-start gap-2 text-sm font-semibold text-amber-900">
                 <TriangleAlert size={18} className="mt-0.5 shrink-0" />
-                Laporan serupa sudah ada — kemungkinan ini masalah yang sama
+                Laporan serupa sudah ada. Kemungkinan ini masalah yang sama.
               </p>
               <ul className="mt-3 space-y-2">
                 {duplicates.map((t) => (
@@ -228,7 +197,7 @@ export default function ReportForm() {
                 ))}
               </ul>
               <p className="mt-2 text-xs text-amber-700">
-                Dukung laporan yang ada agar tidak duplikat — atau tetap kirim laporan baru di bawah jika ini masalah berbeda.
+                Dukung laporan yang ada agar tidak duplikat, atau tetap kirim laporan baru di bawah jika ini masalah berbeda.
               </p>
             </div>
           )}
@@ -284,6 +253,11 @@ export default function ReportForm() {
               </div>
             )}
           </div>
+
+          <p className="rounded-lg bg-gray-50 px-4 py-2.5 text-xs text-gray-500">
+            Prioritas laporan (Darurat / Mendesak / Ringan) ditentukan otomatis oleh sistem
+            dari deskripsi kerusakan dan memengaruhi target waktu penyelesaian.
+          </p>
 
           <button
             type="submit"

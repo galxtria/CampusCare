@@ -1,5 +1,6 @@
 import QRCode from 'qrcode';
 import html2pdf from 'html2pdf.js';
+import { isSameCategory } from '../constants';
 
 /** Normalisasi nama lokasi agar "kelas 412" == "Kelas 412" == "Ruang 412". */
 export const normalizeLocation = (value = '') =>
@@ -9,11 +10,14 @@ export const normalizeLocation = (value = '') =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 
-/** Dua laporan dianggap duplikat bila lokasi + kategori sama dan masih aktif. */
+/** Dua laporan dianggap duplikat hanya bila lokasi SAMA dan kategori PERSIS
+ *  sama. Contoh: AC rusak + proyektor rusak di kelas yang sama (selang 1 jam)
+ *  adalah DUA laporan berbeda dan tidak saling memicu peringatan. */
 export const isDuplicateReport = (a, b) => {
   if (!a || !b || !a.location || !b.location) return false;
-  if ((a.category || '') !== (b.category || '')) return false;
-  return normalizeLocation(a.location) === normalizeLocation(b.location);
+  if (!a.category || !b.category) return false;
+  if (normalizeLocation(a.location) !== normalizeLocation(b.location)) return false;
+  return isSameCategory(a.category, b.category);
 };
 
 const DARURAT_KEYWORDS = ['korsleting', 'terbakar', 'kebakaran', 'bau gas', 'gas bocor', 'banjir', 'runtuh', 'ambruk', 'roboh', 'mati total', 'padam total', 'tersengat', 'kesetrum', 'kaca pecah', 'bocor besar', 'pipa pecah', 'jebol'];

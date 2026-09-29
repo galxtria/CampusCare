@@ -2,12 +2,48 @@ export const API_BASE_URL = 'http://localhost:8001';
 
 export const STORAGE_URL = `${API_BASE_URL}/storage`;
 
+/** Daftar kategori rinci, satu-per-satu (tanpa pengelompokan). */
 export const CATEGORIES = [
-  'Elektronik / Proyektor',
-  'Kelistrikan',
-  'Pipa / Air',
-  'Furniture / Meubeler',
+  'Proyektor',
+  'AC / Pendingin Ruangan',
+  'Komputer Lab',
+  'Speaker / Audio',
+  'Lampu / Penerangan',
+  'Stopkontak / Saklar',
+  'Korsleting / Listrik Padam',
+  'Kebocoran Pipa',
+  'Keran / Wastafel',
+  'Toilet / Kloset',
+  'Saluran Mampet',
+  'Kursi',
+  'Meja',
+  'Pintu / Jendela / Kunci',
+  'Papan Tulis',
+  'WiFi / Internet',
+  'CCTV',
+  'Lainnya',
 ];
+
+/**
+ * Nilai kategori lama (sebelum perincian) disetarakan ke kategori rinci
+ * agar laporan lama tetap ikut tersaring. Hanya berlaku untuk data lama —
+ * laporan baru selalu menyimpan nilai persis dari daftar di atas.
+ */
+const LEGACY_CATEGORY_EQUIVALENTS = {
+  'Elektronik / Proyektor': ['Proyektor'],
+  Kelistrikan: ['Lampu / Penerangan', 'Stopkontak / Saklar', 'Korsleting / Listrik Padam'],
+  'Pipa / Air': ['Kebocoran Pipa', 'Keran / Wastafel', 'Toilet / Kloset', 'Saluran Mampet'],
+  'Furniture / Meubeler': ['Kursi', 'Meja', 'Pintu / Jendela / Kunci', 'Papan Tulis'],
+};
+
+/** Dua nilai kategori dianggap sama (persis, atau setara via data lama). */
+export const isSameCategory = (a = '', b = '') => {
+  if (!a || !b || a === b) return a === b && !!a;
+  return (
+    (LEGACY_CATEGORY_EQUIVALENTS[a] || []).includes(b) ||
+    (LEGACY_CATEGORY_EQUIVALENTS[b] || []).includes(a)
+  );
+};
 
 export const ROOMS = [
   'Lab Komputer 1',

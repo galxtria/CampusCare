@@ -29,8 +29,17 @@ export const tickets = {
   delete: (id) => API.delete(`/tickets/${id}`),
   support: (id) => API.post(`/tickets/${id}/support`),
   unsupport: (id) => API.delete(`/tickets/${id}/support`),
-  markDuplicate: (id, duplicate_of) => API.put(`/tickets/${id}/duplicate`, { duplicate_of }),
   stats: () => API.get('/tickets/stats'),
+  comments: (id) => API.get(`/tickets/${id}/comments`),
+  addComment: (id, body) => API.post(`/tickets/${id}/comments`, { body }),
+  rate: (id, rating, rating_review) => API.put(`/tickets/${id}/rating`, { rating, rating_review }),
+};
+
+export const users = {
+  list: () => API.get('/users'),
+  create: (data) => API.post('/users', data),
+  update: (id, data) => API.put(`/users/${id}`, data),
+  delete: (id) => API.delete(`/users/${id}`),
 };
 
 export default API;

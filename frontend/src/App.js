@@ -6,17 +6,21 @@ import MyReports from './components/MyReports';
 import AdminDashboard from './components/AdminDashboard';
 import ExportReport from './components/ExportReport';
 import QRGenerator from './components/QRGenerator';
+import UserManagement from './components/UserManagement';
 import NotificationSettings from './components/NotificationSettings';
 import Login from './components/Login';
 import AppLayout from './components/layout/AppLayout';
 import { ToastProvider } from './components/ui/Toast';
 import Spinner from './components/ui/Spinner';
 import ChatBot from './components/ChatBot';
+import { useStatusNotifications } from './utils/useStatusNotifications';
 import './App.css';
 
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  useStatusNotifications(user);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -72,6 +76,7 @@ function App() {
                     <Route path="/admin" element={<AdminDashboard />} />
                     <Route path="/admin/export" element={<ExportReport />} />
                     <Route path="/admin/qr" element={<QRGenerator />} />
+                    <Route path="/admin/users" element={<UserManagement currentUser={user} />} />
                     <Route path="*" element={<Navigate to="/admin" />} />
                   </>
                 )}

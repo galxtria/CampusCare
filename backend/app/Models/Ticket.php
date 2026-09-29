@@ -10,7 +10,7 @@ class Ticket extends Model
 {
     protected $fillable = [
         'user_id', 'location', 'category', 'description',
-        'photo_path', 'status', 'urgency', 'admin_notes', 'duplicate_of', 'priority'
+        'photo_path', 'status', 'urgency', 'admin_notes', 'priority'
     ];
 
     public function user(): BelongsTo
@@ -23,18 +23,13 @@ class Ticket extends Model
         return $this->hasMany(TicketSupport::class);
     }
 
-    public function duplicateOf(): BelongsTo
-    {
-        return $this->belongsTo(Ticket::class, 'duplicate_of');
-    }
-
-    public function duplicates(): HasMany
-    {
-        return $this->hasMany(Ticket::class, 'duplicate_of');
-    }
-
     public function histories(): HasMany
     {
         return $this->hasMany(TicketHistory::class)->orderBy('created_at');
+    }
+
+    public function comments(): HasMany
+    {
+        return $this->hasMany(TicketComment::class)->orderBy('created_at');
     }
 }

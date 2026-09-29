@@ -10,7 +10,8 @@ import {
   Wrench,
 } from 'lucide-react';
 import { tickets } from '../api';
-import { CATEGORIES, STORAGE_URL, formatDate } from '../constants';
+import { CATEGORIES, STORAGE_URL, formatDate, isSameCategory } from '../constants';
+import { isDuplicateReport } from '../utils/helpers';
 import { useToast } from './ui/Toast';
 import PageHeader from './ui/PageHeader';
 import StatCard from './ui/StatCard';
@@ -18,6 +19,7 @@ import StatusBadge from './ui/StatusBadge';
 import PriorityBadge from './ui/PriorityBadge';
 import SLABadge from './ui/SLABadge';
 import TicketTimeline from './ui/TicketTimeline';
+import TicketComments from './ui/TicketComments';
 import EmptyState from './ui/EmptyState';
 import Spinner from './ui/Spinner';
 import Modal from './ui/Modal';
@@ -48,8 +50,6 @@ export default function AdminDashboard() {
   const [adminNotes, setAdminNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [duplicateParent, setDuplicateParent] = useState('');
-  const [marking, setMarking] = useState(false);
   const [insight, setInsight] = useState(null);
 
   const loadTickets = async () => {
@@ -77,7 +77,6 @@ export default function AdminDashboard() {
     setChosenStatus(ticket.status);
     setChosenPriority(ticket.priority || 'ringan');
     setAdminNotes(ticket.admin_notes || '');
-    setDuplicateParent('');
     try {
       const res = await tickets.get(ticket.id);
       setSelected(res.data);
@@ -105,7 +104,7 @@ export default function AdminDashboard() {
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .filter((t) => {
         if (statusFilter !== 'all' && t.status !== statusFilter) return false;
-        if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
+        if (categoryFilter !== 'all' && !isSameCategory(t.category, categoryFilter)) return false;
         if (
           q &&
           !`${t.location} ${t.description} ${t.user?.name || ''}`.toLowerCase().includes(q)
@@ -131,28 +130,16 @@ export default function AdminDashboard() {
     }
   };
 
-  const duplicateCandidates = useMemo(() => {
+  /** Tiket aktif lain yang kemungkinan masalah yang sama (info saja). */
+  const similarTickets = useMemo(() => {
     if (!selected) return [];
     return allTickets.filter(
-      (t) => t.id !== selected.id && t.status !== 'resolved' && !t.duplicate_of
+      (t) =>
+        t.id !== selected.id &&
+        t.status !== 'resolved' &&
+        isDuplicateReport(selected, t)
     );
   }, [allTickets, selected]);
-
-  const handleMarkDuplicate = async () => {
-    if (!selected || !duplicateParent) return;
-    setMarking(true);
-    try {
-      await tickets.markDuplicate(selected.id, Number(duplicateParent));
-      toast.success(`Tiket digabung sebagai duplikat #${duplicateParent}`);
-      setSelected(null);
-      setLoading(true);
-      await loadTickets();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Gagal menggabung duplikat');
-    } finally {
-      setMarking(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -198,6 +185,12 @@ export default function AdminDashboard() {
                 Darurat aktif
                 <strong className="text-gray-900">{insight.by_priority?.darurat || 0} tiket</strong>
               </p>
+              <p className="flex justify-between text-gray-600">
+                Rating kepuasan
+                <strong className="text-gray-900">
+                  {insight.rating_count > 0 ? `★ ${insight.avg_rating} (${insight.rating_count})` : '-'}
+                </strong>
+              </p>
             </div>
           </div>
 
@@ -242,7 +235,7 @@ export default function AdminDashboard() {
               })}
             </div>
             <p className="mt-2 text-center text-[11px] text-gray-400">
-              {(insight.trend || [])[0]?.date} — {(insight.trend || []).slice(-1)[0]?.date}
+              {(insight.trend || [])[0]?.date} sampai {(insight.trend || []).slice(-1)[0]?.date}
             </p>
           </div>
         </div>
@@ -328,17 +321,12 @@ export default function AdminDashboard() {
                             {t.supports_count} dukungan
                           </span>
                         )}
-                        {t.duplicate_of && (
-                          <span className="rounded-full bg-purple-100 px-2 py-0.5 font-medium text-purple-800">
-                            Duplikat #{t.duplicate_of}
-                          </span>
-                        )}
                       </p>
                     </td>
                     <td className="whitespace-nowrap px-5 py-3.5">
                       <p className="flex items-center gap-1.5 font-medium text-gray-700">
                         <User size={14} className="text-gray-400" />
-                        {t.user?.name || '-'}
+                        {t.user?.name || 'Tanpa nama'}
                       </p>
                       <p className="pl-5 text-xs text-gray-400">{t.user?.nim_nip || ''}</p>
                     </td>
@@ -372,6 +360,13 @@ export default function AdminDashboard() {
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={selected.status} />
+              <PriorityBadge priority={selected.priority} />
+              <SLABadge ticket={selected} />
+              {selected.rating && (
+                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                  ★ {selected.rating}/5
+                </span>
+              )}
               <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
                 {selected.category}
               </span>
@@ -383,8 +378,8 @@ export default function AdminDashboard() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-xl bg-gray-50 p-4">
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Pelapor</p>
-                <p className="text-sm font-semibold text-gray-900">{selected.user?.name || '-'}</p>
-                <p className="text-xs text-gray-500">NIM/NIP: {selected.user?.nim_nip || '-'}</p>
+                <p className="text-sm font-semibold text-gray-900">{selected.user?.name || 'Tanpa nama'}</p>
+                <p className="text-xs text-gray-500">NIM/NIP: {selected.user?.nim_nip || 'Tidak ada'}</p>
               </div>
               <div className="rounded-xl bg-gray-50 p-4">
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Deskripsi</p>
@@ -422,42 +417,34 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {selected.duplicate_of && (
-              <div className="rounded-xl bg-purple-50 p-4 text-sm text-purple-800 ring-1 ring-inset ring-purple-600/20">
-                Tiket ini adalah <strong>duplikat dari #{selected.duplicate_of}</strong> dan
-                akan ikut selesai saat tiket utama diselesaikan.
+            {similarTickets.length > 0 && (
+              <div className="rounded-xl bg-sky-50 p-4 ring-1 ring-inset ring-sky-600/20">
+                <p className="mb-2 text-sm font-semibold text-sky-900">
+                  Laporan serupa ({similarTickets.length}). Kemungkinan masalah yang sama.
+                </p>
+                <ul className="space-y-1.5">
+                  {similarTickets.map((t) => (
+                    <li key={t.id} className="flex flex-wrap items-center gap-2 text-xs text-sky-900">
+                      <button
+                        type="button"
+                        onClick={() => openDetail(t)}
+                        className="font-bold underline hover:text-sky-700"
+                      >
+                        #{t.id}
+                      </button>
+                      <span>{t.user?.name || 'Pelapor'} · {formatDate(t.created_at)}</span>
+                      <StatusBadge status={t.status} />
+                      {(t.supports_count || 0) > 0 && (
+                        <span className="font-medium">{t.supports_count} dukungan</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-sky-700">
+                  Pertimbangkan menutup salah satunya dengan catatan yang sama bila memang masalah identik.
+                </p>
               </div>
             )}
-
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                Gabung sebagai duplikat dari
-              </label>
-              <div className="flex gap-2">
-                <select
-                  value={duplicateParent}
-                  onChange={(e) => setDuplicateParent(e.target.value)}
-                  className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/15"
-                >
-                  <option value="">— Pilih tiket utama —</option>
-                  {duplicateCandidates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      #{t.id} · {t.location} · {t.category}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={handleMarkDuplicate}
-                  disabled={marking || !duplicateParent}
-                  className="whitespace-nowrap rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:opacity-60"
-                >
-                  {marking ? 'Menggabung...' : 'Gabung'}
-                </button>
-              </div>
-              <p className="mt-1 text-xs text-gray-400">
-                Tiket ini ditutup sebagai duplikat dan mengikuti status tiket utama.
-              </p>
-            </div>
 
             <div>
               <p className="mb-2 text-sm font-semibold text-gray-700">Prioritas</p>
@@ -497,6 +484,13 @@ export default function AdminDashboard() {
                 Riwayat penanganan
               </p>
               <TicketTimeline histories={selected.histories} />
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Diskusi dengan pelapor
+              </p>
+              <TicketComments ticketId={selected.id} initial={selected.comments || []} />
             </div>
 
             <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">

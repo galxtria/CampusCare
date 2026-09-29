@@ -25,7 +25,7 @@ export default function TicketTimeline({ histories = [] }) {
           </p>
           <p className="text-xs text-gray-500">
             {formatDate(h.created_at)}
-            {h.actor?.name ? ` · oleh ${h.actor.name}` : ''}
+            {h.actor?.name ? ` · oleh ${h.actor.name}` : ' · otomatis oleh sistem'}
           </p>
           {h.note && <p className="mt-0.5 text-xs italic text-gray-600">“{h.note}”</p>}
         </li>

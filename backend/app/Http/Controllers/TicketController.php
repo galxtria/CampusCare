@@ -59,7 +59,7 @@ class TicketController extends Controller
     {
         $user = $request->user();
         if ($user->role === 'admin') {
-            return Ticket::with(['user', 'duplicateOf'])->withCount('supports')->get();
+            return Ticket::with('user')->withCount('supports')->get();
         }
         return $user->tickets()->withCount('supports')->get();
     }
@@ -99,7 +99,7 @@ class TicketController extends Controller
 
     public function show(Request $request, $id)
     {
-        $ticket = Ticket::with(['user', 'duplicateOf', 'histories.actor'])
+        $ticket = Ticket::with(['user', 'histories.actor', 'comments.user'])
             ->withCount('supports')
             ->findOrFail($id);
         $user = $request->user();
@@ -184,46 +184,62 @@ class TicketController extends Controller
         ]);
     }
 
-    /**
-     * Tandai tiket sebagai duplikat dari tiket utama (khusus admin).
-     * Tiket duplikat ikut selesai saat tiket utama diselesaikan.
-     */
-    public function markDuplicate(Request $request, $id)
+    /** Daftar komentar tiket (pemilik atau admin). */
+    public function comments(Request $request, $id)
     {
+        $ticket = Ticket::findOrFail($id);
         $user = $request->user();
-        if ($user->role !== 'admin') {
-            return response()->json(['message' => 'Hanya admin yang bisa menggabung duplikat'], 403);
+        if ($user->role !== 'admin' && $ticket->user_id !== $user->id) {
+            return response()->json(['message' => 'Tidak berhak melihat komentar ini'], 403);
+        }
+
+        return $ticket->comments()->with('user:id,name,role')->get();
+    }
+
+    /** Tambah komentar ke tiket (pemilik atau admin). */
+    public function addComment(Request $request, $id)
+    {
+        $ticket = Ticket::findOrFail($id);
+        $user = $request->user();
+        if ($user->role !== 'admin' && $ticket->user_id !== $user->id) {
+            return response()->json(['message' => 'Tidak berhak berkomentar di tiket ini'], 403);
         }
 
         $validated = $request->validate([
-            'duplicate_of' => 'required|integer|exists:tickets,id',
+            'body' => 'required|string|max:1000',
         ]);
 
+        $comment = $ticket->comments()->create([
+            'user_id' => $user->id,
+            'body' => $validated['body'],
+        ]);
+
+        return response()->json($comment->load('user:id,name,role'), 201);
+    }
+
+    /** Beri rating kepuasan (pemilik, tiket harus sudah selesai). */
+    public function rate(Request $request, $id)
+    {
         $ticket = Ticket::findOrFail($id);
-        $parent = Ticket::findOrFail($validated['duplicate_of']);
+        $user = $request->user();
 
-        if ($parent->id === $ticket->id) {
-            return response()->json(['message' => 'Tidak bisa duplikat dari tiket itu sendiri'], 422);
+        if ($ticket->user_id !== $user->id) {
+            return response()->json(['message' => 'Hanya pelapor yang bisa memberi rating'], 403);
         }
-        // Hindari rantai: selalu tautkan ke tiket utama (root).
-        while ($parent->duplicate_of) {
-            $parent = Ticket::findOrFail($parent->duplicate_of);
-            if ($parent->id === $ticket->id) {
-                return response()->json(['message' => 'Terjadi rantai duplikat'], 422);
-            }
+        if ($ticket->status !== 'resolved') {
+            return response()->json(['message' => 'Rating hanya untuk tiket yang sudah selesai'], 422);
         }
 
-        $ticket->duplicate_of = $parent->id;
-        $ticket->status = 'resolved';
-        $note = "Duplikat dari tiket #{$parent->id} ({$parent->location}).";
-        $ticket->admin_notes = $ticket->admin_notes
-            ? $ticket->admin_notes . "\n" . $note
-            : $note;
+        $validated = $request->validate([
+            'rating' => 'required|integer|min:1|max:5',
+            'rating_review' => 'nullable|string|max:500',
+        ]);
+
+        $ticket->rating = $validated['rating'];
+        $ticket->rating_review = $validated['rating_review'] ?? null;
         $ticket->save();
 
-        $this->logHistory($ticket, $user->id, $ticket->getOriginal('status'), 'resolved', "Digabung sebagai duplikat #{$parent->id}");
-
-        return response()->json($ticket->load('duplicateOf'));
+        return response()->json($ticket);
     }
 
     /**
@@ -274,6 +290,8 @@ class TicketController extends Controller
             'by_category' => $byCategory,
             'by_priority' => $byPriority,
             'avg_resolution_hours' => $avgHours,
+            'avg_rating' => round(Ticket::whereNotNull('rating')->avg('rating') ?? 0, 1),
+            'rating_count' => Ticket::whereNotNull('rating')->count(),
             'overdue' => $overdue,
             'top_locations' => $topLocations,
             'trend' => $trend,
@@ -304,13 +322,6 @@ class TicketController extends Controller
                 $validated['status'],
                 $validated['admin_notes'] ?? null
             );
-        }
-
-        // Tiket duplikat ikut selesai saat tiket utama diselesaikan.
-        if (($validated['status'] ?? null) === 'resolved') {
-            Ticket::where('duplicate_of', $ticket->id)
-                ->where('status', '!=', 'resolved')
-                ->update(['status' => 'resolved']);
         }
 
         return response()->json($ticket);

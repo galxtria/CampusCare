@@ -50,7 +50,7 @@ export default function ExportReport() {
         <td style="padding: 12px; font-size: 13px;">${t.category}</td>
         <td style="padding: 12px; font-size: 13px;">${STATUS_LABELS[t.status] || t.status}</td>
         <td style="padding: 12px; font-size: 13px;">${formatDate(t.created_at)}</td>
-        <td style="padding: 12px; font-size: 13px;">${t.user?.name || '-'}</td>
+        <td style="padding: 12px; font-size: 13px;">${t.user?.name || 'Tanpa nama'}</td>
       </tr>
     `
       )
