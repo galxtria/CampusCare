@@ -20,12 +20,17 @@ export const auth = {
 
 export const tickets = {
   list: () => API.get('/tickets'),
+  active: () => API.get('/tickets/active'),
   create: (data) => API.post('/tickets', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   get: (id) => API.get(`/tickets/${id}`),
   update: (id, data) => API.put(`/tickets/${id}`, data),
   delete: (id) => API.delete(`/tickets/${id}`),
+  support: (id) => API.post(`/tickets/${id}/support`),
+  unsupport: (id) => API.delete(`/tickets/${id}/support`),
+  markDuplicate: (id, duplicate_of) => API.put(`/tickets/${id}/duplicate`, { duplicate_of }),
+  stats: () => API.get('/tickets/stats'),
 };
 
 export default API;

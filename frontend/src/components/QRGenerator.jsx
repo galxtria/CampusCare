@@ -1,22 +1,11 @@
 import React, { useState } from 'react';
 import { QrCode, Download } from 'lucide-react';
 import { generateQRCode } from '../utils/helpers';
+import { ROOMS } from '../constants';
 import { useToast } from './ui/Toast';
 import PageHeader from './ui/PageHeader';
 import Spinner from './ui/Spinner';
 import Modal from './ui/Modal';
-
-const ROOMS = [
-  'Lab Komputer 1',
-  'Lab Komputer 2',
-  'Ruang Kuliah 3.1',
-  'Ruang Kuliah 3.2',
-  'Ruang Sidang Utama',
-  'Toilet Lt. 1',
-  'Toilet Lt. 2',
-  'Kantin',
-  'Perpustakaan',
-];
 
 export default function QRGenerator() {
   const toast = useToast();

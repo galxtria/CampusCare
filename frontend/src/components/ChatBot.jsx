@@ -33,6 +33,8 @@ PENGETAHUAN RESMI CAMPUSCARE:
    - DARURAT (prioritas tinggi) — contoh: kebocoran besar, korsleting/bau terbakar, listrik mati total, kerusakan yang membahayakan keselamatan atau menghentikan kegiatan belajar. Target: ditangani sesegera mungkin, maksimal 1x24 jam.
    - MENDESAK (prioritas sedang) — contoh: proyektor mati saat jadwal kuliah, AC/lampu ruangan mati, toilet mampet, keran bocor kecil. Target: maksimal 1-2 hari kerja.
    - RINGAN (prioritas normal) — contoh: kursi goyang, cat terkelupas, satu lampu redup, engsel pintu longgar. Target: maksimal 2-3 hari kerja.
+   - Saat membuat laporan, user WAJIB memilih prioritas (Darurat/Mendesak/Ringan); sistem memberi tebakan otomatis dari deskripsi yang bisa diubah user.
+   - Setiap tiket menampilkan badge tenggat (Sisa X hari / Tenggat hari ini / Terlambat X hari) sesuai prioritasnya.
    - Hari kerja = Senin-Jumat. Jika laporan masuk di akhir pekan/libur, pengerjaan dihitung mulai hari kerja berikutnya.
    - Selalu sebutkan target waktu saat user bertanya "berapa lama" dan kaitkan dengan kategorinya.
 
@@ -50,7 +52,8 @@ PENGETAHUAN RESMI CAMPUSCARE:
    - Menunggu: laporan sudah masuk sistem, menunggu ditinjau tim sarpras.
    - Diproses: teknisi sedang menangani. Lihat "Catatan teknisi" untuk progresnya.
    - Selesai: perbaikan tuntas, fasilitas kembali normal.
-   - Cara cek: menu "Laporan Saya" (riwayat + filter status/kategori + pencarian), atau lihat ringkasan di Dashboard. Klik ikon mata untuk detail dan catatan teknisi.
+   - Cara cek: menu "Laporan Saya" (riwayat + filter status/kategori + pencarian), atau lihat ringkasan di Dashboard. Klik ikon mata untuk detail, catatan teknisi, dan Riwayat penanganan (timeline tiap perubahan status).
+   - Dashboard menampilkan "Fasilitas yang Sudah Dilaporkan" agar tidak duplikat; jika masalahnya sama dengan laporan orang lain, gunakan tombol "Saya juga mengalami ini" daripada membuat laporan baru.
 
 5. ESKALASI (laporan melewati target waktu / tidak ditangani):
    1. Cek dulu status dan catatan teknisi di "Laporan Saya".

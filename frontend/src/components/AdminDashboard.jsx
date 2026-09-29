@@ -15,6 +15,9 @@ import { useToast } from './ui/Toast';
 import PageHeader from './ui/PageHeader';
 import StatCard from './ui/StatCard';
 import StatusBadge from './ui/StatusBadge';
+import PriorityBadge from './ui/PriorityBadge';
+import SLABadge from './ui/SLABadge';
+import TicketTimeline from './ui/TicketTimeline';
 import EmptyState from './ui/EmptyState';
 import Spinner from './ui/Spinner';
 import Modal from './ui/Modal';
@@ -41,9 +44,13 @@ export default function AdminDashboard() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [selected, setSelected] = useState(null);
   const [chosenStatus, setChosenStatus] = useState('pending');
+  const [chosenPriority, setChosenPriority] = useState('ringan');
   const [adminNotes, setAdminNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [duplicateParent, setDuplicateParent] = useState('');
+  const [marking, setMarking] = useState(false);
+  const [insight, setInsight] = useState(null);
 
   const loadTickets = async () => {
     try {
@@ -58,13 +65,28 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadTickets();
+    tickets
+      .stats()
+      .then((res) => setInsight(res.data))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const openDetail = (ticket) => {
+  const openDetail = async (ticket) => {
     setSelected(ticket);
     setChosenStatus(ticket.status);
+    setChosenPriority(ticket.priority || 'ringan');
     setAdminNotes(ticket.admin_notes || '');
+    setDuplicateParent('');
+    try {
+      const res = await tickets.get(ticket.id);
+      setSelected(res.data);
+      setChosenStatus(res.data.status);
+      setChosenPriority(res.data.priority || 'ringan');
+      setAdminNotes(res.data.admin_notes || '');
+    } catch {
+      // tetap tampilkan data ringkas bila detail gagal dimuat
+    }
   };
 
   const stats = useMemo(
@@ -97,7 +119,7 @@ export default function AdminDashboard() {
     if (!selected) return;
     setSaving(true);
     try {
-      await tickets.update(selected.id, { status: chosenStatus, admin_notes: adminNotes });
+      await tickets.update(selected.id, { status: chosenStatus, admin_notes: adminNotes, priority: chosenPriority });
       toast.success(`Tiket ${selected.location} diperbarui`);
       setSelected(null);
       setLoading(true);
@@ -106,6 +128,29 @@ export default function AdminDashboard() {
       toast.error('Gagal menyimpan perubahan');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const duplicateCandidates = useMemo(() => {
+    if (!selected) return [];
+    return allTickets.filter(
+      (t) => t.id !== selected.id && t.status !== 'resolved' && !t.duplicate_of
+    );
+  }, [allTickets, selected]);
+
+  const handleMarkDuplicate = async () => {
+    if (!selected || !duplicateParent) return;
+    setMarking(true);
+    try {
+      await tickets.markDuplicate(selected.id, Number(duplicateParent));
+      toast.success(`Tiket digabung sebagai duplikat #${duplicateParent}`);
+      setSelected(null);
+      setLoading(true);
+      await loadTickets();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Gagal menggabung duplikat');
+    } finally {
+      setMarking(false);
     }
   };
 
@@ -131,6 +176,77 @@ export default function AdminDashboard() {
         <StatCard label="Diproses" value={stats.in_progress} icon={Clock} tone="amber" sub="Sedang dikerjakan" />
         <StatCard label="Selesai" value={stats.resolved} icon={CircleCheck} tone="emerald" sub="Perbaikan tuntas" />
       </div>
+
+      {insight && (
+        <div className="mb-6 grid gap-4 xl:grid-cols-3">
+          <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+            <h3 className="mb-3 text-sm font-semibold text-gray-900">Kinerja Penanganan</h3>
+            <div className="space-y-2 text-sm">
+              <p className="flex justify-between text-gray-600">
+                Rata-rata selesai
+                <strong className="text-gray-900">
+                  {insight.avg_resolution_hours > 0 ? `${insight.avg_resolution_hours} jam` : '-'}
+                </strong>
+              </p>
+              <p className="flex justify-between text-gray-600">
+                Melewati target SLA
+                <strong className={insight.overdue > 0 ? 'text-red-600' : 'text-gray-900'}>
+                  {insight.overdue} tiket
+                </strong>
+              </p>
+              <p className="flex justify-between text-gray-600">
+                Darurat aktif
+                <strong className="text-gray-900">{insight.by_priority?.darurat || 0} tiket</strong>
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+            <h3 className="mb-3 text-sm font-semibold text-gray-900">Lokasi Terbanyak Dilaporkan</h3>
+            <div className="space-y-2">
+              {(insight.top_locations || []).map((l) => (
+                <div key={l.location} className="text-xs">
+                  <div className="mb-1 flex justify-between text-gray-600">
+                    <span className="truncate font-medium">{l.location}</span>
+                    <span className="font-bold text-gray-900">{l.total}</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className="h-full rounded-full bg-red-500"
+                      style={{
+                        width: `${Math.min(100, (l.total / Math.max(1, insight.total)) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+              {(insight.top_locations || []).length === 0 && (
+                <p className="text-xs text-gray-400">Belum ada data.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+            <h3 className="mb-3 text-sm font-semibold text-gray-900">Tren 14 Hari Terakhir</h3>
+            <div className="flex h-24 items-end gap-1">
+              {(insight.trend || []).map((d) => {
+                const max = Math.max(1, ...insight.trend.map((x) => x.total));
+                return (
+                  <div key={d.date} className="flex flex-1 flex-col items-center gap-1" title={`${d.date}: ${d.total}`}>
+                    <div
+                      className="w-full rounded-t bg-red-500/80"
+                      style={{ height: `${Math.max(4, (d.total / max) * 80)}px` }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-center text-[11px] text-gray-400">
+              {(insight.trend || [])[0]?.date} — {(insight.trend || []).slice(-1)[0]?.date}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Filter */}
       <div className="mb-4 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -205,6 +321,19 @@ export default function AdminDashboard() {
                       <p className="mt-0.5 max-w-xs truncate text-xs text-gray-500">
                         {t.category} · {t.description}
                       </p>
+                      <p className="mt-1 flex flex-wrap gap-1 text-xs">
+                        <PriorityBadge priority={t.priority} />
+                        {(t.supports_count || 0) > 0 && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
+                            {t.supports_count} dukungan
+                          </span>
+                        )}
+                        {t.duplicate_of && (
+                          <span className="rounded-full bg-purple-100 px-2 py-0.5 font-medium text-purple-800">
+                            Duplikat #{t.duplicate_of}
+                          </span>
+                        )}
+                      </p>
                     </td>
                     <td className="whitespace-nowrap px-5 py-3.5">
                       <p className="flex items-center gap-1.5 font-medium text-gray-700">
@@ -213,8 +342,9 @@ export default function AdminDashboard() {
                       </p>
                       <p className="pl-5 text-xs text-gray-400">{t.user?.nim_nip || ''}</p>
                     </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-gray-500">
-                      {formatDate(t.created_at)}
+                    <td className="whitespace-nowrap px-5 py-3.5">
+                      <p className="text-gray-500">{formatDate(t.created_at)}</p>
+                      <div className="mt-1"><SLABadge ticket={t} /></div>
                     </td>
                     <td className="whitespace-nowrap px-5 py-3.5">
                       <StatusBadge status={t.status} />
@@ -274,8 +404,7 @@ export default function AdminDashboard() {
               <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
                 <Wrench size={16} className="text-gray-400" />
                 Ubah status pengerjaan
-              </p>
-              <div className="grid grid-cols-3 gap-2">
+              </p>              <div className="grid grid-cols-3 gap-2">
                 {STATUS_FLOW.map((s) => (
                   <button
                     key={s}
@@ -293,6 +422,63 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {selected.duplicate_of && (
+              <div className="rounded-xl bg-purple-50 p-4 text-sm text-purple-800 ring-1 ring-inset ring-purple-600/20">
+                Tiket ini adalah <strong>duplikat dari #{selected.duplicate_of}</strong> dan
+                akan ikut selesai saat tiket utama diselesaikan.
+              </div>
+            )}
+
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                Gabung sebagai duplikat dari
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={duplicateParent}
+                  onChange={(e) => setDuplicateParent(e.target.value)}
+                  className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/15"
+                >
+                  <option value="">— Pilih tiket utama —</option>
+                  {duplicateCandidates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      #{t.id} · {t.location} · {t.category}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleMarkDuplicate}
+                  disabled={marking || !duplicateParent}
+                  className="whitespace-nowrap rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:opacity-60"
+                >
+                  {marking ? 'Menggabung...' : 'Gabung'}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-400">
+                Tiket ini ditutup sebagai duplikat dan mengikuti status tiket utama.
+              </p>
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-semibold text-gray-700">Prioritas</p>
+              <div className="grid grid-cols-3 gap-2">
+                {['ringan', 'mendesak', 'darurat'].map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setChosenPriority(p)}
+                    className={`rounded-lg px-3 py-2 text-xs font-bold capitalize transition sm:text-sm ${
+                      chosenPriority === p
+                        ? 'bg-amber-500 text-white shadow-sm'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-gray-700">
                 Catatan teknisi
@@ -304,6 +490,13 @@ export default function AdminDashboard() {
                 rows="3"
                 className="w-full resize-none rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/15"
               />
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Riwayat penanganan
+              </p>
+              <TicketTimeline histories={selected.histories} />
             </div>
 
             <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">

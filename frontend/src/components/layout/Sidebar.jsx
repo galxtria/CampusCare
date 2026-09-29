@@ -6,9 +6,9 @@ import {
   ClipboardList,
   ShieldCheck,
   LogOut,
-  GraduationCap,
   X,
 } from 'lucide-react';
+import Logo from '../ui/Logo';
 
 const USER_NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -53,9 +53,7 @@ export default function Sidebar({ user, onLogout, mobileOpen, onCloseMobile }) {
 
   const brand = (
     <div className="flex items-center gap-2.5 px-5">
-      <div className="rounded-lg bg-red-600 p-2 text-white">
-        <GraduationCap size={22} />
-      </div>
+      <Logo size={40} />
       <div>
         <p className="text-base font-bold leading-tight text-gray-900">CampusCare</p>
         <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Sarpras Kampus</p>

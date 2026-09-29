@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ImagePlus, X, SendHorizonal } from 'lucide-react';
+import { ImagePlus, X, SendHorizonal, TriangleAlert, ThumbsUp } from 'lucide-react';
 import { tickets } from '../api';
-import { CATEGORIES } from '../constants';
+import { CATEGORIES, ROOMS, OTHER_LOCATION, STATUS_LABELS, PRIORITY_LABELS, PRIORITY_SLA_DAYS } from '../constants';
+import { isDuplicateReport, detectPriority } from '../utils/helpers';
 import { useToast } from './ui/Toast';
 import PageHeader from './ui/PageHeader';
 import Spinner from './ui/Spinner';
@@ -14,9 +15,52 @@ export default function ReportForm() {
   const toast = useToast();
   const navigate = useNavigate();
   const [form, setForm] = useState({ location: '', category: '', description: '' });
+  const [room, setRoom] = useState('');
+  const [priority, setPriority] = useState('ringan');
   const [photo, setPhoto] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [active, setActive] = useState([]);
+  const [supporting, setSupporting] = useState(null);
+
+  useEffect(() => {
+    tickets
+      .active()
+      .then((res) => setActive(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
+  }, []);
+
+  const currentLocation = room === OTHER_LOCATION ? form.location : room;
+
+  // Laporan aktif lain dengan lokasi + kategori sama (maks 14 hari terakhir).
+  const duplicates = useMemo(() => {
+    if (!currentLocation.trim() || !form.category) return [];
+    const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+    return active.filter(
+      (t) =>
+        new Date(t.created_at).getTime() >= cutoff &&
+        isDuplicateReport({ location: currentLocation, category: form.category }, t)
+    );
+  }, [active, currentLocation, form.category]);
+
+  const handleSupport = async (id) => {
+    setSupporting(id);
+    try {
+      const res = await tickets.support(id);
+      setActive((prev) =>
+        prev.map((t) =>
+          t.id === id
+            ? { ...t, supported_by_me: true, supports_count: res.data.supports_count }
+            : t
+        )
+      );
+      toast.success('Dukungan tercatat — Anda tidak perlu membuat laporan baru');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Gagal mendukung laporan');
+    } finally {
+      setSupporting(null);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -39,16 +83,17 @@ export default function ReportForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.location.trim() || !form.category || !form.description.trim()) {
+    if (!currentLocation.trim() || !form.category || !form.description.trim()) {
       toast.error('Lengkapi lokasi, kategori, dan deskripsi terlebih dahulu');
       return;
     }
     setLoading(true);
 
     const formData = new FormData();
-    formData.append('location', form.location.trim());
+    formData.append('location', currentLocation.trim());
     formData.append('category', form.category);
     formData.append('description', form.description.trim());
+    formData.append('priority', priority);
     if (photo) formData.append('photo', photo);
 
     try {
@@ -75,14 +120,29 @@ export default function ReportForm() {
             <label className="mb-1.5 block text-sm font-semibold text-gray-700">
               Lokasi / Ruangan <span className="text-red-600">*</span>
             </label>
-            <input
-              type="text"
-              name="location"
-              value={form.location}
-              onChange={handleChange}
-              placeholder="Contoh: Lab Komputer 2, Ruang Kuliah 3.2"
+            <select
+              value={room}
+              onChange={(e) => setRoom(e.target.value)}
               className={inputClasses}
-            />
+            >
+              <option value="">— Pilih lokasi —</option>
+              {ROOMS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+              <option value={OTHER_LOCATION}>{OTHER_LOCATION}</option>
+            </select>
+            {room === OTHER_LOCATION && (
+              <input
+                type="text"
+                name="location"
+                value={form.location}
+                onChange={handleChange}
+                placeholder="Tulis nama lokasi, contoh: Kelas 412"
+                className={`${inputClasses} mt-2`}
+              />
+            )}
           </div>
 
           <div>
@@ -98,6 +158,80 @@ export default function ReportForm() {
               ))}
             </select>
           </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+              Prioritas <span className="text-red-600">*</span>
+            </label>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              className={inputClasses}
+            >
+              {Object.entries(PRIORITY_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label} — target {PRIORITY_SLA_DAYS[key]} hari
+                </option>
+              ))}
+            </select>
+            {(() => {
+              const guessed = detectPriority(`${currentLocation} ${form.description}`);
+              return (
+                guessed !== priority && (
+                  <button
+                    type="button"
+                    onClick={() => setPriority(guessed)}
+                    className="mt-1.5 text-xs font-semibold text-red-600 hover:text-red-700"
+                  >
+                    Sistem mendeteksi ini prioritas {PRIORITY_LABELS[guessed]} — klik untuk pakai
+                  </button>
+                )
+              );
+            })()}
+          </div>
+
+          {duplicates.length > 0 && (
+            <div className="rounded-xl bg-amber-50 p-4 ring-1 ring-inset ring-amber-600/20">
+              <p className="flex items-start gap-2 text-sm font-semibold text-amber-900">
+                <TriangleAlert size={18} className="mt-0.5 shrink-0" />
+                Laporan serupa sudah ada — kemungkinan ini masalah yang sama
+              </p>
+              <ul className="mt-3 space-y-2">
+                {duplicates.map((t) => (
+                  <li
+                    key={t.id}
+                    className="flex flex-wrap items-center gap-2 rounded-lg bg-white/70 px-3 py-2 text-xs text-amber-900"
+                  >
+                    <span className="font-semibold">
+                      #{t.id} · {t.location}
+                    </span>
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium">
+                      {STATUS_LABELS[t.status] || t.status}
+                    </span>
+                    <span>· {t.supports_count} dukungan</span>
+                    {t.is_mine ? (
+                      <span className="font-medium text-gray-500">(laporan Anda)</span>
+                    ) : t.supported_by_me ? (
+                      <span className="font-medium text-emerald-700">✓ Sudah Anda dukung</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleSupport(t.id)}
+                        disabled={supporting === t.id}
+                        className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1 font-semibold text-white transition hover:bg-amber-700 disabled:opacity-60"
+                      >
+                        <ThumbsUp size={13} />
+                        {supporting === t.id ? 'Menyimpan...' : 'Saya juga mengalami ini'}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-amber-700">
+                Dukung laporan yang ada agar tidak duplikat — atau tetap kirim laporan baru di bawah jika ini masalah berbeda.
+              </p>
+            </div>
+          )}
 
           <div>
             <div className="mb-1.5 flex items-center justify-between">

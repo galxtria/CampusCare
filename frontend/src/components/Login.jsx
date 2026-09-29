@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GraduationCap, CircleAlert, Eye, EyeOff, CircleCheck, LogIn } from 'lucide-react';
+import { CircleAlert, Eye, EyeOff, CircleCheck, LogIn } from 'lucide-react';
+import Logo from './ui/Logo';
 import { auth } from '../api';
 import Spinner from './ui/Spinner';
 
@@ -49,9 +50,7 @@ export default function Login({ setUser }) {
       {/* Panel branding */}
       <div className="hidden w-1/2 flex-col justify-between bg-gradient-to-br from-red-800 via-red-700 to-red-600 p-12 text-white lg:flex">
         <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-white/15 p-2.5">
-            <GraduationCap size={28} />
-          </div>
+          <Logo size={46} />
           <div>
             <p className="text-xl font-bold">CampusCare</p>
             <p className="text-xs font-medium uppercase tracking-widest text-red-200">
@@ -81,9 +80,7 @@ export default function Login({ setUser }) {
       <div className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
           <div className="mb-6 flex justify-center lg:hidden">
-            <div className="rounded-xl bg-red-600 p-3 text-white">
-              <GraduationCap size={30} />
-            </div>
+            <Logo size={56} />
           </div>
 
           <h2 className="text-center text-2xl font-bold tracking-tight text-gray-900">CampusCare</h2>

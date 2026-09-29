@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#DC2626"/>
+      <stop offset="1" stop-color="#991B1B"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#bg)"/>
+  <!-- Toga (mortarboard) -->
+  <polygon points="32,15 54,24 32,33 10,24" fill="#FFFFFF"/>
+  <path d="M22 28.5 V38 c0 3.5 20 3.5 20 0 V28.5 L32 33 Z" fill="#FECACA"/>
+  <line x1="54" y1="24" x2="54" y2="38" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round"/>
+  <circle cx="54" cy="40.5" r="3" fill="#FBBF24"/>
+  <!-- Badge ceklis "care / beres" -->
+  <circle cx="46" cy="46" r="11" fill="#FFFFFF"/>
+  <path d="M41 46.2 l3.4 3.4 L51.5 42" stroke="#DC2626" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

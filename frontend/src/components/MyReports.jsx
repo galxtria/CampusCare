@@ -6,6 +6,9 @@ import { CATEGORIES, STORAGE_URL, formatDate } from '../constants';
 import { useToast } from './ui/Toast';
 import PageHeader from './ui/PageHeader';
 import StatusBadge from './ui/StatusBadge';
+import PriorityBadge from './ui/PriorityBadge';
+import SLABadge from './ui/SLABadge';
+import TicketTimeline from './ui/TicketTimeline';
 import EmptyState from './ui/EmptyState';
 import Spinner from './ui/Spinner';
 import Modal from './ui/Modal';
@@ -28,6 +31,16 @@ export default function MyReports() {
   const [selected, setSelected] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  const openDetail = async (t) => {
+    setSelected(t);
+    try {
+      const res = await tickets.get(t.id);
+      setSelected(res.data);
+    } catch {
+      // tetap tampilkan data ringkas bila detail gagal dimuat
+    }
+  };
 
   useEffect(() => {
     tickets
@@ -154,11 +167,12 @@ export default function MyReports() {
       ) : (
         <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="w-full min-w-[760px] text-left text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/70 text-xs uppercase tracking-wide text-gray-500">
                   <th className="px-5 py-3 font-semibold">Lokasi</th>
                   <th className="px-5 py-3 font-semibold">Kategori</th>
+                  <th className="px-5 py-3 font-semibold">Prioritas</th>
                   <th className="px-5 py-3 font-semibold">Status</th>
                   <th className="px-5 py-3 font-semibold">Tanggal</th>
                   <th className="px-5 py-3 text-right font-semibold">Aksi</th>
@@ -173,13 +187,19 @@ export default function MyReports() {
                     </td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-gray-600">{t.category}</td>
                     <td className="whitespace-nowrap px-5 py-3.5">
+                      <PriorityBadge priority={t.priority} />
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3.5">
                       <StatusBadge status={t.status} />
                     </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-gray-500">{formatDate(t.created_at)}</td>
+                    <td className="whitespace-nowrap px-5 py-3.5">
+                      <p className="text-gray-500">{formatDate(t.created_at)}</p>
+                      <div className="mt-1"><SLABadge ticket={t} /></div>
+                    </td>
                     <td className="whitespace-nowrap px-5 py-3.5">
                       <div className="flex justify-end gap-1.5">
                         <button
-                          onClick={() => setSelected(t)}
+                          onClick={() => openDetail(t)}
                           title="Lihat detail"
                           className="rounded-lg p-2 text-blue-600 transition hover:bg-blue-50"
                         >
@@ -208,9 +228,21 @@ export default function MyReports() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={selected.status} />
+              <PriorityBadge priority={selected.priority} />
+              <SLABadge ticket={selected} />
               <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
                 {selected.category}
               </span>
+              {(selected.supports_count || 0) > 0 && (
+                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
+                  {selected.supports_count} dukungan
+                </span>
+              )}
+              {selected.duplicate_of && (
+                <span className="rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-800">
+                  Duplikat #{selected.duplicate_of} — mengikuti tiket utama
+                </span>
+              )}
               <span className="inline-flex items-center gap-1 text-xs text-gray-400">
                 <MapPin size={13} />
                 {formatDate(selected.created_at)}
@@ -236,6 +268,12 @@ export default function MyReports() {
                 Catatan teknisi
               </p>
               <p className="text-gray-800">{selected.admin_notes || 'Belum ada catatan dari tim sarpras.'}</p>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Riwayat penanganan
+              </p>
+              <TicketTimeline histories={selected.histories} />
             </div>
           </div>
         )}
