@@ -19,7 +19,6 @@ import StatusBadge from './ui/StatusBadge';
 import PriorityBadge from './ui/PriorityBadge';
 import SLABadge from './ui/SLABadge';
 import TicketTimeline from './ui/TicketTimeline';
-import TicketComments from './ui/TicketComments';
 import EmptyState from './ui/EmptyState';
 import Spinner from './ui/Spinner';
 import Modal from './ui/Modal';
@@ -66,6 +65,7 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
@@ -133,14 +133,15 @@ export default function AdminDashboard() {
       .filter((t) => {
         if (statusFilter !== 'all' && t.status !== statusFilter) return false;
         if (categoryFilter !== 'all' && !isSameCategory(t.category, categoryFilter)) return false;
+        if (priorityFilter !== 'all' && (t.priority || 'ringan') !== priorityFilter) return false;
         if (dateFrom && new Date(t.created_at) < new Date(dateFrom)) return false;
         if (dateTo && new Date(t.created_at) > new Date(`${dateTo}T23:59:59`)) return false;
         if (q && !`${t.location} ${t.description} ${t.user?.name || ''}`.toLowerCase().includes(q)) return false;
         return true;
       });
-  }, [allTickets, search, statusFilter, categoryFilter, dateFrom, dateTo]);
+  }, [allTickets, search, statusFilter, categoryFilter, priorityFilter, dateFrom, dateTo]);
 
-  useEffect(() => { setPage(1); }, [search, statusFilter, categoryFilter, dateFrom, dateTo]);
+  useEffect(() => { setPage(1); }, [search, statusFilter, categoryFilter, priorityFilter, dateFrom, dateTo]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const paged = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
@@ -263,6 +264,12 @@ export default function AdminDashboard() {
             <option value="all">Semua kategori</option>
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
+          <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-red-600 focus:outline-none">
+            <option value="all">Semua prioritas</option>
+            <option value="darurat">Darurat</option>
+            <option value="mendesak">Mendesak</option>
+            <option value="ringan">Ringan</option>
+          </select>
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm" title="Dari tanggal" />
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm" title="Sampai tanggal" />
         </div>
@@ -363,6 +370,7 @@ export default function AdminDashboard() {
             )}
             <div>
               <p className="mb-2 text-sm font-semibold text-gray-700">Prioritas</p>
+              {selected.priority_reason && <p className="mb-2 text-xs text-gray-400">Terdeteksi otomatis: {selected.priority_reason}</p>}
               <div className="grid grid-cols-3 gap-2">
                 {['ringan', 'mendesak', 'darurat'].map((p) => <button key={p} type="button" onClick={() => setChosenPriority(p)} className={`rounded-lg px-3 py-2 text-xs font-bold capitalize transition sm:text-sm ${chosenPriority === p ? 'bg-amber-500 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{p}</button>)}
               </div>
@@ -376,7 +384,6 @@ export default function AdminDashboard() {
               <textarea value={adminNotes} onChange={(e) => setAdminNotes(e.target.value)} placeholder="Contoh: Lampu proyektor sudah diganti baru" rows="3" className="w-full resize-none rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/15" />
             </div>
             <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Riwayat penanganan</p><TicketTimeline histories={selected.histories} /></div>
-            <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Diskusi dengan pelapor</p><TicketComments ticketId={selected.id} initial={selected.comments || []} /></div>
             <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
               <button onClick={() => setSelected(null)} className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>
               <button onClick={handleSave} disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60">{saving && <Spinner size={16} />}Simpan Perubahan</button>

@@ -23,27 +23,59 @@ class TicketController extends Controller
     ];
 
     /**
+     * Skoring prioritas berbobot dari kerusakan itu sendiri (bukan ruangannya),
+     * agar kerusakan yang sama selalu dapat prioritas yang sama.
+     * Mengembalikan ['priority' => ..., 'reasons' => [...]] agar transparan.
+     */
+    public static function scorePriority(string $text, string $category = ''): array
+    {
+        $t = mb_strtolower($text);
+        $score = 0;
+        $reasons = [];
+
+        $darurat = ['korsleting', 'terbakar', 'kebakaran', 'bau gas', 'gas bocor', 'banjir', 'runtuh', 'ambruk', 'roboh', 'tersengat', 'kesetrum', 'kaca pecah', 'pipa pecah', 'bocor besar', 'jebol', 'bahaya', 'meledak', 'ledakan'];
+        foreach ($darurat as $k) {
+            if (str_contains($t, $k)) {
+                return ['priority' => 'darurat', 'reasons' => ["kata kunci bahaya: \"{$k}\""]];
+            }
+        }
+
+        $fungsiMati = ['mati', 'rusak', 'bocor', 'mampet', 'mampat', 'tersumbat', 'tidak menyala', 'tidak dingin', 'tidak bisa', 'patah', 'pecah', 'jatuh', 'macet', 'padam', 'rembes'];
+        foreach ($fungsiMati as $k) {
+            if (str_contains($t, $k)) {
+                $score += 1;
+                $reasons[] = "fungsi terganggu: \"{$k}\"";
+                break;
+            }
+        }
+
+        $dampakLuas = ['semua', 'total', 'seluruh', 'satu ruangan', 'tidak bisa dipakai', 'terganggu', 'menggangu', 'batal', 'darurat'];
+        foreach ($dampakLuas as $k) {
+            if (str_contains($t, $k)) {
+                $score += 1;
+                $reasons[] = "dampak luas: \"{$k}\"";
+                break;
+            }
+        }
+
+        $criticalCategories = ['Korsleting / Listrik Padam', 'Kebocoran Pipa', 'WiFi / Internet', 'CCTV', 'AC / Pendingin Ruangan', 'Komputer Lab', 'Proyektor'];
+        if (in_array($category, $criticalCategories)) {
+            $score += 1;
+            $reasons[] = "kategori kritis: {$category}";
+        }
+
+        if ($score >= 3) return ['priority' => 'darurat', 'reasons' => array_slice($reasons, 0, 3)];
+        if ($score >= 1) return ['priority' => 'mendesak', 'reasons' => array_slice($reasons, 0, 3)];
+        return ['priority' => 'ringan', 'reasons' => ['kerusakan ringan, tidak mengganggu kegiatan']];
+    }
+
+    /**
      * Tebak prioritas dari teks laporan bila user tidak memilih manual.
+     * (Kompatibilitas mundur — gunakan scorePriority untuk versi beralasan.)
      */
     public static function detectPriority(string $text): string
     {
-        $t = mb_strtolower($text);
-
-        $darurat = ['korsleting', 'terbakar', 'kebakaran', 'bau gas', 'gas bocor', 'banjir', 'runtuh', 'ambruk', 'roboh', 'mati total', 'padam total', 'tersengat', 'kesetrum', 'kaca pecah', 'bocor besar', 'pipa pecah', 'jebol'];
-        foreach ($darurat as $k) {
-            if (str_contains($t, $k)) {
-                return 'darurat';
-            }
-        }
-
-        $mendesak = ['mati', 'rusak', 'bocor', 'mampet', 'mampat', 'tersumbat', 'tidak menyala', 'tidak dingin', 'tidak bisa', 'patah', 'pecah', 'jatuh', 'macet', 'padam', 'rembes'];
-        foreach ($mendesak as $k) {
-            if (str_contains($t, $k)) {
-                return 'mendesak';
-            }
-        }
-
-        return 'ringan';
+        return self::scorePriority($text)['priority'];
     }
 
     protected function logHistory(Ticket $ticket, $actorId, $from, $to, $note = null): void
@@ -175,6 +207,7 @@ class TicketController extends Controller
             'description' => 'required|string',
             'photo' => 'nullable|image|max:5120',
             'priority' => 'nullable|in:ringan,mendesak,darurat',
+            'priority_reason' => 'nullable|string|max:255',
         ]);
 
         $photo_path = null;
@@ -182,8 +215,9 @@ class TicketController extends Controller
             $photo_path = $request->file('photo')->store('tickets', 'public');
         }
 
-        $priority = $validated['priority']
-            ?? self::detectPriority($validated['location'] . ' ' . $validated['description']);
+        $scored = self::scorePriority($validated['location'] . ' ' . $validated['description'], $validated['category']);
+        $priority = $validated['priority'] ?? $scored['priority'];
+        $reason = $validated['priority_reason'] ?? implode('; ', $scored['reasons']);
 
         $ticket = Ticket::create([
             'user_id' => $request->user()->id,
@@ -193,6 +227,7 @@ class TicketController extends Controller
             'photo_path' => $photo_path,
             'status' => 'pending',
             'priority' => $priority,
+            'priority_reason' => $reason,
         ]);
 
         $this->logHistory($ticket, $request->user()->id, null, 'pending', 'Laporan dibuat');
@@ -533,6 +568,11 @@ class TicketController extends Controller
         $user = $request->user();
         if ($user->role !== 'admin' && $ticket->user_id !== $user->id) {
             return response()->json(['message' => 'Tidak berhak menghapus tiket ini'], 403);
+        }
+        // Mahasiswa hanya boleh menghapus laporannya selagi masih Menunggu.
+        // Yang sudah Diproses/Selesai adalah arsip penanganan dan hanya admin yang boleh menghapus.
+        if ($user->role !== 'admin' && $ticket->status !== 'pending') {
+            return response()->json(['message' => 'Laporan yang sudah diproses atau selesai tidak bisa dihapus'], 403);
         }
         $ticket->delete();
         return response()->json(null, 204);

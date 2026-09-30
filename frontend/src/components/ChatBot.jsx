@@ -32,7 +32,10 @@ PENGETAHUAN RESMI CAMPUSCARE:
    Kursi, Meja, Pintu / Jendela / Kunci, Papan Tulis,
    WiFi / Internet, CCTV, Lainnya.
 
-2. TINGKAT PRIORITAS & TARGET WAKTU PENGERJAAN (bawaan sistem, paling lama 2-3 hari):
+2. TINGKAT PRIORITAS & TARGET WAKTU PENGERJAAN (ditentukan OTOMATIS oleh sistem lewat skoring kerusakan, sama untuk semua ruangan):
+    - Sinyal bahaya (korsleting, terbakar, banjir, dsb) langsung DARURAT.
+    - Sinyal lain menambah skor: fungsi mati/rusak, dampak luas (semua/total/kuliah batal), kategori kritis (listrik, pipa, WiFi, CCTV, AC, komputer lab, proyektor).
+    - Skor 3 atau lebih berarti DARURAT, 1 sampai 2 berarti MENDESAK, 0 berarti RINGAN. Alasan penilaiannya tampil di tiket dan bisa dikoreksi admin.
    - DARURAT (prioritas tinggi). Contoh: kebocoran besar, korsleting/bau terbakar, listrik mati total, kerusakan yang membahayakan keselamatan atau menghentikan kegiatan belajar. Target: ditangani sesegera mungkin, maksimal 1x24 jam.
    - MENDESAK (prioritas sedang). Contoh: proyektor mati saat jadwal kuliah, AC/lampu ruangan mati, toilet mampet, keran bocor kecil. Target: maksimal 1-2 hari kerja.
    - RINGAN (prioritas normal). Contoh: kursi goyang, cat terkelupas, satu lampu redup, engsel pintu longgar. Target: maksimal 2-3 hari kerja.
@@ -45,7 +48,7 @@ PENGETAHUAN RESMI CAMPUSCARE:
    1. Login dengan NIM/NIP dan password akun kampus.
    2. Buka menu "Laporkan Kerusakan" (tombol di Dashboard).
    3. Isi Lokasi/Ruangan selengkap mungkin (contoh: Lab Komputer 2, Ruang Kuliah 3.2).
-   4. Pilih Kategori Kerusakan.
+   4. Pilih Kategori Kerusakan yang sesuai ruangannya (misal keran/toilet hanya di toilet, kantin, atau lab; komputer hanya di lab). Bila muncul peringatan kecocokan, periksa lagi atau centang konfirmasi bila memang benar.
    5. Tulis Deskripsi Keluhan yang jelas (apa yang rusak, sejak kapan, kronologinya). Maks 500 karakter.
    6. Lampirkan Foto Bukti (JPG/PNG, maks 5 MB). Foto bersifat opsional tapi sangat disarankan agar teknisi cepat paham.
    7. Klik "Kirim Laporan". Laporan masuk dengan status Menunggu.
@@ -70,8 +73,7 @@ PENGETAHUAN RESMI CAMPUSCARE:
     - Akun mahasiswa berasal dari Sistem Akademik (nama, NIM, prodi, angkatan otomatis). Mahasiswa baru wajib AKTIVASI dulu di halaman Aktivasi: masukkan NIM (cek otomatis ke SIAKAD) lalu atur password CampusCare sendiri. NIM tidak terdaftar berarti hubungi bagian akademik, bukan admin sarpras.
     - Setelah aktivasi, login dengan NIM dan password CampusCare. Data nama/NIM/prodi tidak bisa diubah sendiri; yang bisa diubah hanya password di Profil Saya.
    - Laporan bisa dihapus via tombol hapus di "Laporan Saya" (hapus permanen).
-   - Setiap tiket bisa didiskusikan via kolom "Diskusi dengan teknisi" di halaman detail.
-   - Setelah tiket Selesai, berikan rating bintang 1 sampai 5 + ulasan agar kualitas layanan terpantau.
+    - Setelah tiket Selesai, berikan rating bintang 1 sampai 5 + ulasan agar kualitas layanan terpantau.
    - Pantau progres di menu "Laporan Saya" atau ringkasan Dashboard. Perubahan status terlihat di kolom status dan Riwayat penanganan tiap tiket.
    - Export rekap PDF dan QR code ruangan adalah fitur khusus admin.`;
 

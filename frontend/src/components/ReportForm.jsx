@@ -4,9 +4,10 @@ import jsQR from 'jsqr';
 import { ImagePlus, X, SendHorizonal, TriangleAlert, ThumbsUp, QrCode, Upload } from 'lucide-react';
 import { tickets, rooms as roomsAPI } from '../api';
 import { CATEGORIES, ROOMS, OTHER_LOCATION, STATUS_LABELS } from '../constants';
-import { isDuplicateReport, detectPriority, compressImage } from '../utils/helpers';
+import { isDuplicateReport, scorePriority, compressImage, checkCategoryRoom } from '../utils/helpers';
 import { useToast } from './ui/Toast';
 import PageHeader from './ui/PageHeader';
+import PriorityBadge from './ui/PriorityBadge';
 import Spinner from './ui/Spinner';
 import Modal from './ui/Modal';
 
@@ -64,6 +65,12 @@ export default function ReportForm() {
 
   const currentLocation = room === OTHER_LOCATION ? form.location : room;
 
+  // Preview prioritas live dari isi laporan (sama dengan skoring backend).
+  const scored = useMemo(
+    () => scorePriority(`${currentLocation} ${form.description}`, form.category),
+    [currentLocation, form.description, form.category]
+  );
+
   // Laporan aktif lain dengan lokasi + kategori persis sama (maks 14 hari terakhir).
   const duplicates = useMemo(() => {
     if (!currentLocation.trim() || !form.category) return [];
@@ -78,6 +85,16 @@ export default function ReportForm() {
   // Konfirmasi "masalah berbeda" harus diulang tiap ganti lokasi/kategori.
   useEffect(() => {
     setAckDifferent(false);
+  }, [currentLocation, form.category]);
+
+  // Peringatan bila kategori janggal untuk ruangannya (misal keran di lab komputer).
+  const mismatchWarning = useMemo(
+    () => checkCategoryRoom(form.category, currentLocation),
+    [form.category, currentLocation]
+  );
+  const [ackMismatch, setAckMismatch] = useState(false);
+  useEffect(() => {
+    setAckMismatch(false);
   }, [currentLocation, form.category]);
 
   const handleSupport = async (id) => {
@@ -193,14 +210,19 @@ export default function ReportForm() {
       toast.error('Centang konfirmasi bahwa ini masalah berbeda, atau dukung laporan yang ada');
       return;
     }
+    if (mismatchWarning && !ackMismatch) {
+      toast.error('Centang konfirmasi kategori vs ruangan di bawah terlebih dahulu');
+      return;
+    }
     setLoading(true);
 
     const formData = new FormData();
     formData.append('location', currentLocation.trim());
     formData.append('category', form.category);
     formData.append('description', form.description.trim());
-    // Prioritas ditentukan otomatis oleh sistem dari isi laporan.
-    formData.append('priority', detectPriority(`${currentLocation} ${form.description}`));
+    // Prioritas + alasan ditentukan otomatis oleh sistem dari isi laporan.
+    formData.append('priority', scored.priority);
+    formData.append('priority_reason', scored.reasons.join('; '));
     if (photo) formData.append('photo', photo);
 
     try {
@@ -270,6 +292,24 @@ export default function ReportForm() {
               ))}
             </select>
           </div>
+
+          {mismatchWarning && (
+            <div className="rounded-xl bg-amber-50 p-4 ring-1 ring-inset ring-amber-600/20">
+              <p className="flex items-start gap-2 text-sm font-semibold text-amber-900">
+                <TriangleAlert size={18} className="mt-0.5 shrink-0" />
+                {mismatchWarning}
+              </p>
+              <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg bg-white/70 px-3 py-2 text-xs font-medium text-amber-900">
+                <input
+                  type="checkbox"
+                  checked={ackMismatch}
+                  onChange={(e) => setAckMismatch(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-amber-600"
+                />
+                Saya yakin kategori dan ruangan sudah benar (misal memang ada keran di ruangan ini)
+              </label>
+            </div>
+          )}
 
           {duplicates.length > 0 && (
             <div className="rounded-xl bg-amber-50 p-4 ring-1 ring-inset ring-amber-600/20">
@@ -375,18 +415,23 @@ export default function ReportForm() {
             )}
           </div>
 
+          <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-4 py-2.5 text-xs text-gray-600">
+            <span>Prioritas terdeteksi:</span>
+            <PriorityBadge priority={scored.priority} />
+            <span className="text-gray-400">· {scored.reasons.join('; ')}</span>
+          </div>
           <p className="rounded-lg bg-gray-50 px-4 py-2.5 text-xs text-gray-500">
-            Prioritas laporan (Darurat / Mendesak / Ringan) ditentukan otomatis oleh sistem
-            dari deskripsi kerusakan dan memengaruhi target waktu penyelesaian.
+            Prioritas memengaruhi target waktu penyelesaian (Darurat 1 hari, Mendesak 2 hari, Ringan 3 hari).
+            Admin dapat mengoreksi bila tidak tepat.
           </p>
 
           <button
             type="submit"
-            disabled={loading || (duplicates.length > 0 && !ackDifferent)}
+            disabled={loading || (duplicates.length > 0 && !ackDifferent) || (mismatchWarning && !ackMismatch)}
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60"
           >
             {loading ? <Spinner size={18} /> : <SendHorizonal size={18} />}
-            {loading ? 'Mengirim laporan...' : duplicates.length > 0 && !ackDifferent ? 'Kunci: konfirmasi dulu di atas' : 'Kirim Laporan'}
+            {loading ? 'Mengirim laporan...' : (duplicates.length > 0 && !ackDifferent) || (mismatchWarning && !ackMismatch) ? 'Kunci: konfirmasi dulu di atas' : 'Kirim Laporan'}
           </button>
         </div>
       </form>

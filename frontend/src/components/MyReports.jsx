@@ -9,7 +9,6 @@ import StatusBadge from './ui/StatusBadge';
 import PriorityBadge from './ui/PriorityBadge';
 import SLABadge from './ui/SLABadge';
 import TicketTimeline from './ui/TicketTimeline';
-import TicketComments from './ui/TicketComments';
 import TicketRating from './ui/TicketRating';
 import EmptyState from './ui/EmptyState';
 import Spinner from './ui/Spinner';
@@ -217,8 +216,9 @@ export default function MyReports() {
                         </button>
                         <button
                           onClick={() => setPendingDelete(t)}
-                          title="Hapus"
-                          className="rounded-lg p-2 text-red-600 transition hover:bg-red-50"
+                          title={t.status === 'pending' ? 'Hapus' : 'Hanya laporan Menunggu yang bisa dihapus'}
+                          disabled={t.status !== 'pending'}
+                          className="rounded-lg p-2 text-red-600 transition hover:bg-red-50 disabled:opacity-30"
                         >
                           <Trash2 size={17} />
                         </button>
@@ -287,12 +287,6 @@ export default function MyReports() {
               </p>
               <TicketTimeline histories={selected.histories} />
             </div>
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Diskusi dengan teknisi
-              </p>
-              <TicketComments ticketId={selected.id} initial={selected.comments || []} />
-            </div>
             <TicketRating
               ticket={selected}
               onRated={(updated) => {
@@ -307,7 +301,7 @@ export default function MyReports() {
       <ConfirmDialog
         open={!!pendingDelete}
         title="Hapus laporan?"
-        message={`Laporan "${pendingDelete?.location}" akan dihapus permanen dan tidak bisa dikembalikan.`}
+        message={`Laporan "${pendingDelete?.location}" akan dihapus permanen dan tidak bisa dikembalikan. Laporan yang sudah diproses tidak bisa dihapus agar arsip penanganan tetap utuh.`}
         loading={deleting}
         onCancel={() => setPendingDelete(null)}
         onConfirm={handleDelete}

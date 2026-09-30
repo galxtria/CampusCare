@@ -1,6 +1,6 @@
 import QRCode from 'qrcode';
 import html2pdf from 'html2pdf.js';
-import { isSameCategory } from '../constants';
+import { isSameCategory, ROOM_TYPE_KEYWORDS, CATEGORY_ROOM_TYPES } from '../constants';
 
 /** Normalisasi nama lokasi agar "kelas 412" == "Kelas 412" == "Ruang 412". */
 export const normalizeLocation = (value = '') =>
@@ -20,16 +20,33 @@ export const isDuplicateReport = (a, b) => {
   return isSameCategory(a.category, b.category);
 };
 
-const DARURAT_KEYWORDS = ['korsleting', 'terbakar', 'kebakaran', 'bau gas', 'gas bocor', 'banjir', 'runtuh', 'ambruk', 'roboh', 'mati total', 'padam total', 'tersengat', 'kesetrum', 'kaca pecah', 'bocor besar', 'pipa pecah', 'jebol'];
-const MENDESAK_KEYWORDS = ['mati', 'rusak', 'bocor', 'mampet', 'mampat', 'tersumbat', 'tidak menyala', 'tidak dingin', 'tidak bisa', 'patah', 'pecah', 'jatuh', 'macet', 'padam', 'rembes'];
+const DARURAT_KEYWORDS = ['korsleting', 'terbakar', 'kebakaran', 'bau gas', 'gas bocor', 'banjir', 'runtuh', 'ambruk', 'roboh', 'tersengat', 'kesetrum', 'kaca pecah', 'pipa pecah', 'bocor besar', 'jebol', 'bahaya', 'meledak', 'ledakan'];
+const FUNGSI_KEYWORDS = ['mati', 'rusak', 'bocor', 'mampet', 'mampat', 'tersumbat', 'tidak menyala', 'tidak dingin', 'tidak bisa', 'patah', 'pecah', 'jatuh', 'macet', 'padam', 'rembes'];
+const DAMPAK_KEYWORDS = ['semua', 'total', 'seluruh', 'satu ruangan', 'tidak bisa dipakai', 'terganggu', 'menggangu', 'batal', 'darurat'];
+const KRITIS_CATEGORIES = ['Korsleting / Listrik Padam', 'Kebocoran Pipa', 'WiFi / Internet', 'CCTV', 'AC / Pendingin Ruangan', 'Komputer Lab', 'Proyektor'];
+
+/** Skoring prioritas berbobot dari kerusakannya (mirror logika backend): { priority, reasons }. */
+export const scorePriority = (text = '', category = '') => {
+  const t = text.toLowerCase();
+  let score = 0;
+  const reasons = [];
+  for (const k of DARURAT_KEYWORDS) {
+    if (t.includes(k)) return { priority: 'darurat', reasons: [`kata kunci bahaya: "${k}"`] };
+  }
+  for (const k of FUNGSI_KEYWORDS) {
+    if (t.includes(k)) { score += 1; reasons.push(`fungsi terganggu: "${k}"`); break; }
+  }
+  for (const k of DAMPAK_KEYWORDS) {
+    if (t.includes(k)) { score += 1; reasons.push(`dampak luas: "${k}"`); break; }
+  }
+  if (KRITIS_CATEGORIES.includes(category)) { score += 1; reasons.push(`kategori kritis: ${category}`); }
+  if (score >= 3) return { priority: 'darurat', reasons: reasons.slice(0, 3) };
+  if (score >= 1) return { priority: 'mendesak', reasons: reasons.slice(0, 3) };
+  return { priority: 'ringan', reasons: ['kerusakan ringan, tidak mengganggu kegiatan'] };
+};
 
 /** Tebak prioritas dari teks (mirip logika backend, untuk hint di form). */
-export const detectPriority = (text = '') => {
-  const t = text.toLowerCase();
-  if (DARURAT_KEYWORDS.some((k) => t.includes(k))) return 'darurat';
-  if (MENDESAK_KEYWORDS.some((k) => t.includes(k))) return 'mendesak';
-  return 'ringan';
-};
+export const detectPriority = (text = '') => scorePriority(text).priority;
 
 export const PRIORITY_SLA_DAYS = { darurat: 1, mendesak: 2, ringan: 3 };
 
@@ -62,6 +79,29 @@ export const generateQRCode = async (text) => {
   }
 };
 
+/** Tipe ruangan dari namanya; 'other' bila tak dikenali (selalu lolos cek). */
+export const detectRoomType = (location = '') => {
+  const t = location.toLowerCase();
+  for (const [type, keywords] of Object.entries(ROOM_TYPE_KEYWORDS)) {
+    if (keywords.some((k) => t.includes(k))) return type;
+  }
+  return 'other';
+};
+
+/**
+ * Cek kecocokan kategori vs ruangan.
+ * Return null bila cocok/tak perlu dicek, atau pesan peringatan bila janggal
+ * (misal keran di lab komputer). Sengaja peringatan lunak, bukan blokir,
+ * karena selalu ada pengecualian di lapangan.
+ */
+export const checkCategoryRoom = (category, location) => {
+  if (!category || !location?.trim()) return null;
+  const allowed = CATEGORY_ROOM_TYPES[category];
+  if (!allowed) return null;
+  const type = detectRoomType(location);
+  if (type === 'other' || allowed.includes(type)) return null;
+  return `Kategori "${category}" tidak biasa di "${location.trim()}". Periksa kembali ruangan/kategorinya.`;
+};
 /** Kompres gambar ke max 1280px JPEG 0.8 agar upload ringan. Return File. */
 export const compressImage = (file, maxDim = 1280, quality = 0.8) =>
   new Promise((resolve) => {

@@ -10,7 +10,7 @@ class Ticket extends Model
 {
     protected $fillable = [
         'user_id', 'assigned_to', 'location', 'category', 'description',
-        'photo_path', 'photo_after_path', 'status', 'urgency', 'admin_notes', 'priority'
+        'photo_path', 'photo_after_path', 'status', 'urgency', 'admin_notes', 'priority', 'priority_reason'
     ];
 
     public function user(): BelongsTo

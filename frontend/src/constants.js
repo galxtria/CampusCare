@@ -60,6 +60,28 @@ export const ROOMS = [
 
 export const OTHER_LOCATION = 'Lainnya (tulis manual)';
 
+/** Tipe ruangan dari kata kunci nama (ruangan custom yang tak dikenali = 'other', selalu lolos). */
+export const ROOM_TYPE_KEYWORDS = {
+  toilet: ['toilet', 'wc', 'kamar mandi'],
+  lab: ['lab', 'laboratorium'],
+  kelas: ['kelas', 'kuliah', 'ruang belajar'],
+  kantin: ['kantin'],
+  perpus: ['perpus'],
+  sidang: ['sidang', 'rapat', 'aula'],
+};
+
+/** Kategori yang hanya wajar di tipe ruangan tertentu (selain ini bebas di mana saja). */
+export const CATEGORY_ROOM_TYPES = {
+  'Proyektor': ['lab', 'kelas', 'sidang', 'perpus'],
+  'Komputer Lab': ['lab'],
+  'Papan Tulis': ['lab', 'kelas', 'sidang'],
+  'Speaker / Audio': ['lab', 'kelas', 'sidang', 'kantin', 'perpus'],
+  'Keran / Wastafel': ['toilet', 'kantin'],
+  'Toilet / Kloset': ['toilet'],
+  'Saluran Mampet': ['toilet', 'kantin'],
+  'AC / Pendingin Ruangan': ['lab', 'kelas', 'sidang', 'perpus', 'kantin'],
+};
+
 export const STATUS_LABELS = {
   pending: 'Menunggu',
   in_progress: 'Diproses',
