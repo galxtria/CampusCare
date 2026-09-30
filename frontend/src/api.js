@@ -79,6 +79,13 @@ export const users = {
   siakadStudents: () => API.get('/siakad/students'),
 };
 
+export const rooms = {
+  list: () => API.get('/rooms'),
+  create: (name) => API.post('/rooms', { name }),
+  update: (id, name) => API.put(`/rooms/${id}`, { name }),
+  delete: (id) => API.delete(`/rooms/${id}`),
+};
+
 export const notifications = {
   list: () => API.get('/notifications'),
   unreadCount: () => API.get('/notifications/unread-count'),

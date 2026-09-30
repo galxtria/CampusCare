@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ImagePlus, X, SendHorizonal, TriangleAlert, ThumbsUp, QrCode } from 'lucide-react';
-import { tickets } from '../api';
+import jsQR from 'jsqr';
+import { ImagePlus, X, SendHorizonal, TriangleAlert, ThumbsUp, QrCode, Upload } from 'lucide-react';
+import { tickets, rooms as roomsAPI } from '../api';
 import { CATEGORIES, ROOMS, OTHER_LOCATION, STATUS_LABELS } from '../constants';
 import { isDuplicateReport, detectPriority, compressImage } from '../utils/helpers';
 import { useToast } from './ui/Toast';
@@ -25,25 +26,39 @@ export default function ReportForm() {
   const [ackDifferent, setAckDifferent] = useState(false);
   const [searchParams] = useSearchParams();
   const [scanOpen, setScanOpen] = useState(false);
+  const [roomList, setRoomList] = useState(ROOMS);
+  const appliedRoomRef = useRef(false);
   const videoRef = useRef(null);
   const scanTimer = useRef(null);
 
+  const applyRoomName = (roomName, list) => {
+    const match = (list || roomList).find((r) => r.toLowerCase() === String(roomName).toLowerCase());
+    if (match) setRoom(match);
+    else { setRoom(OTHER_LOCATION); setForm((p) => ({ ...p, location: String(roomName) })); }
+  };
+
   useEffect(() => {
     const roomParam = searchParams.get('room') || localStorage.getItem('pendingRoom');
-    if (roomParam) {
+    if (roomParam && !appliedRoomRef.current) {
+      appliedRoomRef.current = true;
       localStorage.removeItem('pendingRoom');
-      const match = ROOMS.find((r) => r.toLowerCase() === roomParam.toLowerCase());
-      if (match) setRoom(match);
-      else { setRoom(OTHER_LOCATION); setForm((p) => ({ ...p, location: roomParam })); }
+      applyRoomName(roomParam, roomList);
       toast.success?.(`Lokasi terisi dari QR: ${roomParam}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [roomList]);
 
   useEffect(() => {
     tickets
       .active()
       .then((res) => setActive(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
+    roomsAPI
+      .list()
+      .then((res) => {
+        const names = (Array.isArray(res.data) ? res.data : []).map((r) => r.name).filter(Boolean);
+        if (names.length > 0) setRoomList(names);
+      })
       .catch(() => {});
   }, []);
 
@@ -107,10 +122,21 @@ export default function ReportForm() {
     if (videoRef.current) videoRef.current.srcObject = null;
   };
 
+  const applyScannedRoom = (raw) => {
+    let roomName = raw;
+    try {
+      const u = new URL(raw);
+      roomName = u.searchParams.get('room') || raw;
+    } catch {}
+    applyRoomName(roomName, roomList);
+    toast.success(`QR terbaca: ${roomName}`);
+    stopScan(); setScanOpen(false);
+  };
+
   const startScan = async () => {
     setScanOpen(true);
     try {
-      if (!('BarcodeDetector' in window)) { toast.error('Browser tidak mendukung scan kamera. Gunakan QR berupa link.'); return; }
+      if (!('BarcodeDetector' in window)) { toast.error('Kamera langsung tidak didukung browser ini. Gunakan tombol "Upload foto QR" di bawah.'); return; }
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       if (videoRef.current) videoRef.current.srcObject = stream;
       await videoRef.current?.play?.();
@@ -120,21 +146,35 @@ export default function ReportForm() {
         try {
           const codes = await detector.detect(videoRef.current);
           const raw = codes?.[0]?.rawValue;
-          if (raw) {
-            let roomName = raw;
-            try {
-              const u = new URL(raw);
-              roomName = u.searchParams.get('room') || raw;
-            } catch {}
-            const match = ROOMS.find((r) => r.toLowerCase() === String(roomName).toLowerCase());
-            if (match) setRoom(match);
-            else { setRoom(OTHER_LOCATION); setForm((p) => ({ ...p, location: String(roomName) })); }
-            toast.success(`QR terbaca: ${roomName}`);
-            stopScan(); setScanOpen(false);
-          }
+          if (raw) applyScannedRoom(raw);
         } catch {}
       }, 500);
-    } catch { toast.error('Tidak bisa akses kamera'); }
+    } catch { toast.error('Tidak bisa akses kamera. Gunakan tombol "Upload foto QR" di bawah.'); }
+  };
+
+  /** Fallback: foto/screenshot QR → decode lokal via jsQR (jalan di semua browser). */
+  const handleQRFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.src = url;
+      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(data.data, data.width, data.height);
+      if (code?.data) applyScannedRoom(code.data);
+      else toast.error('QR tidak terbaca dari foto. Pastikan foto jelas dan tidak blur.');
+    } catch {
+      toast.error('Gagal membaca foto QR');
+    }
+    e.target.value = '';
   };
 
   const removePhoto = () => {
@@ -198,7 +238,7 @@ export default function ReportForm() {
               className={inputClasses}
             >
               <option value="">Pilih lokasi</option>
-              {ROOMS.map((r) => (
+              {roomList.map((r) => (
                 <option key={r} value={r}>
                   {r}
                 </option>
@@ -355,6 +395,13 @@ export default function ReportForm() {
         <div className="space-y-3">
           <video ref={videoRef} className="h-64 w-full rounded-xl bg-black object-cover" muted playsInline />
           <p className="text-xs text-gray-500">Arahkan kamera ke QR yang ditempel di pintu ruangan. QR berisi link laporan dengan lokasi otomatis.</p>
+          <div className="rounded-xl border-2 border-dashed border-gray-300 p-4 text-center">
+            <input type="file" accept="image/*" onChange={handleQRFile} className="hidden" id="qr-file-input" />
+            <label htmlFor="qr-file-input" className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800">
+              <Upload size={16} /> Upload foto QR
+            </label>
+            <p className="mt-2 text-xs text-gray-400">Alternatif bila kamera tidak didukung: foto QR pakai kamera HP lalu upload di sini.</p>
+          </div>
         </div>
       </Modal>
     </div>

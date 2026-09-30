@@ -9,6 +9,7 @@ import {
   X,
   Users,
   User,
+  Building2,
 } from 'lucide-react';
 import Logo from '../ui/Logo';
 
@@ -21,6 +22,7 @@ const USER_NAV = [
 
 const ADMIN_NAV = [
   { to: '/admin', label: 'Kelola Tiket', icon: ShieldCheck, end: true },
+  { to: '/admin/rooms', label: 'Kelola Ruangan', icon: Building2 },
   { to: '/admin/export', label: 'Export Laporan', icon: FilePlus2 },
   { to: '/admin/qr', label: 'QR Code', icon: FilePlus2 },
   { to: '/admin/users', label: 'Kelola Pengguna', icon: Users },

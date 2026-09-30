@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard';
 import ReportForm from './components/ReportForm';
 import MyReports from './components/MyReports';
 import AdminDashboard from './components/AdminDashboard';
+import RoomManagement from './components/RoomManagement';
 import ExportReport from './components/ExportReport';
 import QRGenerator from './components/QRGenerator';
 import UserManagement from './components/UserManagement';
@@ -22,7 +23,7 @@ function QRRedirect() {
   const [params] = useSearchParams();
   const room = params.get('room');
   if (room) localStorage.setItem('pendingRoom', room);
-  return <Navigate to="/login" replace />;
+  return <Navigate to={room ? `/login?room=${encodeURIComponent(room)}` : '/login'} replace />;
 }
 
 function App() {
@@ -86,6 +87,7 @@ function App() {
                 ) : (
                   <>
                     <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/admin/rooms" element={<RoomManagement />} />
                     <Route path="/admin/export" element={<ExportReport />} />
                     <Route path="/admin/qr" element={<QRGenerator />} />
                     <Route path="/admin/users" element={<UserManagement currentUser={user} />} />

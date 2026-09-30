@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { QrCode, Download, Copy, Printer } from 'lucide-react';
 import { generateQRCode, reportLinkForRoom } from '../utils/helpers';
 import { ROOMS } from '../constants';
+import { rooms as roomsAPI } from '../api';
 import { useToast } from './ui/Toast';
 import PageHeader from './ui/PageHeader';
 import Spinner from './ui/Spinner';
@@ -9,12 +10,20 @@ import Modal from './ui/Modal';
 
 export default function QRGenerator() {
   const toast = useToast();
+  const [roomList, setRoomList] = useState(ROOMS);
   const [selectedRoom, setSelectedRoom] = useState('');
   const [qrCode, setQRCode] = useState(null);
   const [qrLink, setQrLink] = useState('');
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
+
+  useEffect(() => {
+    roomsAPI.list().then((res) => {
+      const names = (Array.isArray(res.data) ? res.data : []).map((r) => r.name).filter(Boolean);
+      if (names.length > 0) setRoomList(names);
+    }).catch(() => {});
+  }, []);
 
   const handleGenerateQR = async () => {
     if (!selectedRoom) { toast.error('Pilih ruangan terlebih dahulu'); return; }
@@ -46,7 +55,7 @@ export default function QRGenerator() {
   const downloadAll = async () => {
     setBulkLoading(true);
     try {
-      for (const r of ROOMS) {
+      for (const r of roomList) {
         const link = reportLinkForRoom(r);
         const qr = await generateQRCode(link);
         if (!qr) continue;
@@ -56,7 +65,7 @@ export default function QRGenerator() {
         a.click();
         await new Promise((res) => setTimeout(res, 300));
       }
-      toast.success(`${ROOMS.length} QR berhasil diunduh`);
+      toast.success(`${roomList.length} QR berhasil diunduh`);
     } finally { setBulkLoading(false); }
   };
 
@@ -69,14 +78,15 @@ export default function QRGenerator() {
             <label className="mb-2 block text-sm font-semibold text-gray-700">Pilih Ruangan</label>
             <select value={selectedRoom} onChange={(e) => setSelectedRoom(e.target.value)} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/15">
               <option value="">Pilih ruangan</option>
-              {ROOMS.map((r) => <option key={r} value={r}>{r}</option>)}
+              {roomList.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
+            <p className="mt-2 text-xs text-gray-400">Tidak ada di daftar? <a href="/admin/rooms" className="font-semibold text-red-600 hover:text-red-700">Tambah di Kelola Ruangan</a></p>
           </div>
           <button onClick={handleGenerateQR} disabled={loading || !selectedRoom} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white transition hover:bg-red-700 disabled:opacity-60">
             {loading ? <Spinner size={18} /> : <QrCode size={18} />} {loading ? 'Membuat QR...' : 'Buat QR Code'}
           </button>
           <button onClick={downloadAll} disabled={bulkLoading} className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60">
-            {bulkLoading ? <Spinner size={18} /> : <Printer size={18} />} {bulkLoading ? 'Mengunduh...' : `Unduh semua (${ROOMS.length} ruangan)`}
+            {bulkLoading ? <Spinner size={18} /> : <Printer size={18} />} {bulkLoading ? 'Mengunduh...' : `Unduh semua (${roomList.length} ruangan)`}
           </button>
           <p className="rounded-lg bg-blue-50 p-3 text-xs text-blue-700 ring-1 ring-inset ring-blue-600/20">
             QR berisi link seperti <code>/report/new?room=Lab Komputer 1</code>. Mahasiswa scan lalu lokasi otomatis terisi di form laporan.

@@ -38,6 +38,8 @@ export default function Activate({ setUser }) {
   };
 
   useEffect(() => {
+    const room = params.get('room');
+    if (room) localStorage.setItem('pendingRoom', room);
     if (params.get('nim')) handleCheck();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
