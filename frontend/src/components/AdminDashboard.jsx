@@ -29,6 +29,7 @@ const STATUS_TABS = [
   { key: 'pending', label: 'Menunggu' },
   { key: 'in_progress', label: 'Diproses' },
   { key: 'resolved', label: 'Selesai' },
+  { key: 'rejected', label: 'Ditolak' },
 ];
 
 const STATUS_FLOW = ['pending', 'in_progress', 'resolved'];
@@ -120,6 +121,7 @@ export default function AdminDashboard() {
       pending: allTickets.filter((t) => t.status === 'pending').length,
       in_progress: allTickets.filter((t) => t.status === 'in_progress').length,
       resolved: allTickets.filter((t) => t.status === 'resolved').length,
+      rejected: allTickets.filter((t) => t.status === 'rejected').length,
     }),
     [allTickets]
   );
@@ -145,6 +147,10 @@ export default function AdminDashboard() {
 
   const handleSave = async () => {
     if (!selected) return;
+    if (chosenStatus === 'rejected' && !adminNotes.trim()) {
+      toast.error('Alasan penolakan wajib diisi (laporan palsu harus tercatat alasannya)');
+      return;
+    }
     setSaving(true);
     try {
       let payload;
@@ -186,6 +192,10 @@ export default function AdminDashboard() {
 
   const handleBulkApply = async () => {
     if (checkedIds.length === 0) return;
+    if (bulkStatus === 'rejected' && !bulkNotes.trim()) {
+      toast.error('Alasan penolakan wajib diisi untuk aksi massal');
+      return;
+    }
     setBulkApplying(true);
     try {
       const payload = { ids: checkedIds, status: bulkStatus, admin_notes: bulkNotes.trim() || undefined };
@@ -359,6 +369,9 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-3 gap-2">
                 {STATUS_FLOW.map((s) => <button key={s} type="button" onClick={() => setChosenStatus(s)} className={`rounded-lg px-3 py-2.5 text-xs font-bold transition sm:text-sm ${chosenStatus === s ? 'bg-red-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{STATUS_ACTION_LABEL[s]}</button>)}
               </div>
+              <button type="button" onClick={() => setChosenStatus('rejected')} className={`mt-2 w-full rounded-lg px-3 py-2.5 text-xs font-bold transition sm:text-sm ${chosenStatus === 'rejected' ? 'bg-gray-800 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                Tolak laporan (palsu / tidak terbukti)
+              </button>
             </div>
             {similarTickets.length > 0 && (
               <div className="rounded-xl bg-sky-50 p-4 ring-1 ring-inset ring-sky-600/20">
@@ -378,7 +391,9 @@ export default function AdminDashboard() {
               <input type="file" accept="image/*" onChange={(e) => setPhotoAfter(e.target.files?.[0] || null)} className="w-full text-sm" />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-semibold text-gray-700">Catatan teknisi</label>
+              <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                {chosenStatus === 'rejected' ? 'Alasan penolakan (wajib)' : 'Catatan teknisi'}
+              </label>
               <textarea value={adminNotes} onChange={(e) => setAdminNotes(e.target.value)} placeholder="Contoh: Lampu proyektor sudah diganti baru" rows="3" className="w-full resize-none rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/15" />
             </div>
             <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Riwayat penanganan</p><TicketTimeline histories={selected.histories} /></div>

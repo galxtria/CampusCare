@@ -21,6 +21,7 @@ const STATUS_TABS = [
   { key: 'pending', label: 'Menunggu' },
   { key: 'in_progress', label: 'Diproses' },
   { key: 'resolved', label: 'Selesai' },
+  { key: 'rejected', label: 'Ditolak' },
 ];
 
 export default function MyReports() {
@@ -66,6 +67,7 @@ export default function MyReports() {
       pending: data.filter((t) => t.status === 'pending').length,
       in_progress: data.filter((t) => t.status === 'in_progress').length,
       resolved: data.filter((t) => t.status === 'resolved').length,
+      rejected: data.filter((t) => t.status === 'rejected').length,
     }),
     [data]
   );
@@ -283,7 +285,7 @@ export default function MyReports() {
               }`}
             >
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Catatan teknisi
+                {selected.status === 'rejected' ? 'Alasan penolakan' : 'Catatan teknisi'}
               </p>
               <p className="text-gray-800">{selected.admin_notes || 'Belum ada catatan dari tim sarpras.'}</p>
             </div>

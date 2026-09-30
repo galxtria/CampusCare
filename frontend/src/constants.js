@@ -86,6 +86,7 @@ export const STATUS_LABELS = {
   pending: 'Menunggu',
   in_progress: 'Diproses',
   resolved: 'Selesai',
+  rejected: 'Ditolak',
 };
 
 export const PRIORITY_LABELS = {

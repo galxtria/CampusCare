@@ -458,11 +458,15 @@ class TicketController extends Controller
         $validated = $request->validate([
             'ids' => 'required|array|min:1|max:100',
             'ids.*' => 'integer|exists:tickets,id',
-            'status' => 'sometimes|in:pending,in_progress,resolved',
+            'status' => 'sometimes|in:pending,in_progress,resolved,rejected',
             'admin_notes' => 'nullable|string',
             'priority' => 'sometimes|in:ringan,mendesak,darurat',
             'assigned_to' => 'nullable|integer|exists:users,id',
         ]);
+
+        if (($validated['status'] ?? null) === 'rejected' && empty(trim($validated['admin_notes'] ?? ''))) {
+            return response()->json(['message' => 'Alasan penolakan wajib diisi'], 422);
+        }
 
         $changes = collect($validated)->only(['status', 'admin_notes', 'priority', 'assigned_to'])->toArray();
         if (empty($changes)) {
@@ -482,14 +486,17 @@ class TicketController extends Controller
                     $changes['status'],
                     $changes['admin_notes'] ?? null
                 );
-                // Laporan identik di luar pilihan ikut berubah otomatis.
-                $updated += $this->cascadeIdentical(
-                    $ticket,
-                    $changes['status'],
-                    $request->user()->id,
-                    $changes['admin_notes'] ?? null,
-                    $validated['ids']
-                );
+                // Laporan identik di luar pilihan ikut berubah otomatis,
+                // kecuali penolakan (dinilai satu per satu).
+                if ($changes['status'] !== 'rejected') {
+                    $updated += $this->cascadeIdentical(
+                        $ticket,
+                        $changes['status'],
+                        $request->user()->id,
+                        $changes['admin_notes'] ?? null,
+                        $validated['ids']
+                    );
+                }
             }
             $updated++;
         }
@@ -511,7 +518,7 @@ class TicketController extends Controller
             return response()->json(['message' => 'Hanya petugas yang bisa mengubah tiket'], 403);
         }
         $validated = $request->validate([
-            'status' => 'sometimes|in:pending,in_progress,resolved',
+            'status' => 'sometimes|in:pending,in_progress,resolved,rejected',
             'admin_notes' => 'nullable|string',
             'priority' => 'sometimes|in:ringan,mendesak,darurat',
             'assigned_to' => 'nullable|integer|exists:users,id',
@@ -529,6 +536,12 @@ class TicketController extends Controller
 
         $oldStatus = $ticket->status;
         $oldAssignee = $ticket->assigned_to;
+
+        // Penolakan laporan palsu wajib disertai alasan tertulis.
+        if (($validated['status'] ?? null) === 'rejected' && empty(trim($validated['admin_notes'] ?? ''))) {
+            return response()->json(['message' => 'Alasan penolakan wajib diisi'], 422);
+        }
+
         $ticket->update($validated);
         $ticket->refresh();
 
@@ -541,15 +554,19 @@ class TicketController extends Controller
                 $validated['admin_notes'] ?? null
             );
 
-            // Laporan identik lain yang masih aktif ikut berubah otomatis.
-            $followed = $this->cascadeIdentical(
-                $ticket,
-                $validated['status'],
-                $user->id,
-                $validated['admin_notes'] ?? null
-            );
+            // Laporan identik lain ikut berubah otomatis, KECUALI penolakan:
+            // tiap laporan dinilai sendiri agar yang benar tidak ikut ditolak.
+            $followed = 0;
+            if ($validated['status'] !== 'rejected') {
+                $followed = $this->cascadeIdentical(
+                    $ticket,
+                    $validated['status'],
+                    $user->id,
+                    $validated['admin_notes'] ?? null
+                );
+            }
 
-            $label = ['pending' => 'Menunggu', 'in_progress' => 'Diproses', 'resolved' => 'Selesai'][$validated['status']] ?? $validated['status'];
+            $label = ['pending' => 'Menunggu', 'in_progress' => 'Diproses', 'resolved' => 'Selesai', 'rejected' => 'Ditolak'][$validated['status']] ?? $validated['status'];
             $this->notifyUser($ticket->user_id, $ticket->id, "Laporan {$ticket->location}: {$label}", $ticket->admin_notes);
 
             return response()->json(array_merge(

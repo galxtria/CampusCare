@@ -59,9 +59,11 @@ export const getSLADeadline = (createdAt, priority = 'ringan') => {
   return d;
 };
 
-/** Status SLA: { key, label, tone }. Tiket selesai selalu 'done'. */
+/** Status SLA: { key, label, tone }. Tiket selesai/ditolak selalu terminal. */
 export const getSLAStatus = (ticket) => {
-  if (!ticket || ticket.status === 'resolved') return { key: 'done', label: 'Selesai', tone: 'emerald' };
+  if (!ticket) return { key: 'done', label: 'Selesai', tone: 'emerald' };
+  if (ticket.status === 'resolved') return { key: 'done', label: 'Selesai', tone: 'emerald' };
+  if (ticket.status === 'rejected') return { key: 'rejected', label: 'Ditolak', tone: 'slate' };
   const deadline = getSLADeadline(ticket.created_at, ticket.priority);
   const daysLeft = Math.ceil((deadline - new Date()) / (24 * 60 * 60 * 1000));
   if (daysLeft < 0) return { key: 'overdue', label: `Terlambat ${Math.abs(daysLeft)} hari`, tone: 'red' };

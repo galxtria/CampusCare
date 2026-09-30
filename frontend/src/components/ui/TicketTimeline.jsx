@@ -5,6 +5,7 @@ const DOT = {
   pending: 'bg-red-500',
   in_progress: 'bg-amber-500',
   resolved: 'bg-emerald-500',
+  rejected: 'bg-gray-500',
 };
 
 /** Garis waktu perubahan status tiket. */

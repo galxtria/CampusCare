@@ -60,9 +60,10 @@ PENGETAHUAN RESMI CAMPUSCARE:
    8. Tips: sebagian ruangan memiliki QR code di pintu. Scan QR tersebut untuk mempermudah pengisian lokasi.
 
 4. STATUS LAPORAN:
-   - Menunggu: laporan sudah masuk sistem, menunggu ditinjau tim sarpras.
-   - Diproses: teknisi sedang menangani. Lihat "Catatan teknisi" untuk progresnya.
-   - Selesai: perbaikan tuntas, fasilitas kembali normal.
+    - Menunggu: laporan sudah masuk sistem, menunggu ditinjau tim sarpras.
+    - Diproses: teknisi sedang menangani. Lihat "Catatan teknisi" untuk progresnya.
+    - Selesai: perbaikan tuntas, fasilitas kembali normal.
+    - Ditolak: laporan dinyatakan palsu atau tidak terbukti setelah dicek admin, disertai alasan penolakan. Laporan ditolak tidak bisa dihapus dan tidak masuk statistik penyelesaian.
    - Cara cek: menu "Laporan Saya" (riwayat + filter status/kategori + pencarian), atau lihat ringkasan di Dashboard. Klik ikon mata untuk detail, catatan teknisi, dan Riwayat penanganan (timeline tiap perubahan status).
    - Dashboard menampilkan "Fasilitas yang Sudah Dilaporkan" agar tidak duplikat; jika masalahnya sama dengan laporan orang lain, gunakan tombol "Saya juga mengalami ini" daripada membuat laporan baru.
 
