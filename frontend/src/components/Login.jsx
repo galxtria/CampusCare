@@ -34,7 +34,7 @@ export default function Login({ setUser }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.nim_nip.trim() || !form.password) {
-      setError('NIM/NIP dan password harus diisi');
+      setError('NIM dan password harus diisi');
       return;
     }
     setError('');
@@ -115,7 +115,7 @@ export default function Login({ setUser }) {
                 name="nim_nip"
                 value={form.nim_nip}
                 onChange={handleChange}
-                placeholder="Masukan NIM/NIP"
+                placeholder="Masukan NIM"
                 autoComplete="username"
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/15"
               />

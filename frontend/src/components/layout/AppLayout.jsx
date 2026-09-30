@@ -39,9 +39,6 @@ export default function AppLayout({ user, onLogout, children }) {
               <Link to="/profile" title="Profil saya" className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100">
                 <User size={20} />
               </Link>
-              <span className="hidden rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-600/20 sm:block">
-                {user?.role === 'admin' ? 'Admin Sarpras' : `NIM ${user?.nim_nip}`}
-              </span>
             </div>
           </div>
         </header>
