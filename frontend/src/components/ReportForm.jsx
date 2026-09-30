@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ImagePlus, X, SendHorizonal, TriangleAlert, ThumbsUp } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ImagePlus, X, SendHorizonal, TriangleAlert, ThumbsUp, QrCode } from 'lucide-react';
 import { tickets } from '../api';
 import { CATEGORIES, ROOMS, OTHER_LOCATION, STATUS_LABELS } from '../constants';
-import { isDuplicateReport, detectPriority } from '../utils/helpers';
+import { isDuplicateReport, detectPriority, compressImage } from '../utils/helpers';
 import { useToast } from './ui/Toast';
 import PageHeader from './ui/PageHeader';
 import Spinner from './ui/Spinner';
+import Modal from './ui/Modal';
 
 const inputClasses =
   'w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/15';
@@ -22,6 +23,21 @@ export default function ReportForm() {
   const [active, setActive] = useState([]);
   const [supporting, setSupporting] = useState(null);
   const [ackDifferent, setAckDifferent] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [scanOpen, setScanOpen] = useState(false);
+  const videoRef = useRef(null);
+  const scanTimer = useRef(null);
+
+  useEffect(() => {
+    const roomParam = searchParams.get('room');
+    if (roomParam) {
+      const match = ROOMS.find((r) => r.toLowerCase() === roomParam.toLowerCase());
+      if (match) setRoom(match);
+      else { setRoom(OTHER_LOCATION); setForm((p) => ({ ...p, location: roomParam })); }
+      toast.success?.(`Lokasi terisi dari QR: ${roomParam}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     tickets
@@ -72,12 +88,52 @@ export default function ReportForm() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('File harus gambar JPG/PNG'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Foto maksimal 5 MB'); return; }
+    const compressed = await compressImage(file);
     if (preview) URL.revokeObjectURL(preview);
-    setPhoto(file);
-    setPreview(URL.createObjectURL(file));
+    setPhoto(compressed);
+    setPreview(URL.createObjectURL(compressed));
+  };
+
+  const stopScan = () => {
+    if (scanTimer.current) clearInterval(scanTimer.current);
+    const stream = videoRef.current?.srcObject;
+    stream?.getTracks()?.forEach((t) => t.stop());
+    if (videoRef.current) videoRef.current.srcObject = null;
+  };
+
+  const startScan = async () => {
+    setScanOpen(true);
+    try {
+      if (!('BarcodeDetector' in window)) { toast.error('Browser tidak mendukung scan kamera. Gunakan QR berupa link.'); return; }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      await videoRef.current?.play?.();
+      // @ts-ignore
+      const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+      scanTimer.current = setInterval(async () => {
+        try {
+          const codes = await detector.detect(videoRef.current);
+          const raw = codes?.[0]?.rawValue;
+          if (raw) {
+            let roomName = raw;
+            try {
+              const u = new URL(raw);
+              roomName = u.searchParams.get('room') || raw;
+            } catch {}
+            const match = ROOMS.find((r) => r.toLowerCase() === String(roomName).toLowerCase());
+            if (match) setRoom(match);
+            else { setRoom(OTHER_LOCATION); setForm((p) => ({ ...p, location: String(roomName) })); }
+            toast.success(`QR terbaca: ${roomName}`);
+            stopScan(); setScanOpen(false);
+          }
+        } catch {}
+      }, 500);
+    } catch { toast.error('Tidak bisa akses kamera'); }
   };
 
   const removePhoto = () => {
@@ -127,9 +183,14 @@ export default function ReportForm() {
       <form onSubmit={handleSubmit} className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm lg:p-8">
         <div className="space-y-5">
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+            <label className="mb-1.5 flex items-center justify-between text-sm font-semibold text-gray-700">
               Lokasi / Ruangan <span className="text-red-600">*</span>
             </label>
+            <div className="mb-2 flex gap-2">
+              <button type="button" onClick={startScan} className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-gray-800">
+                <QrCode size={14} /> Scan QR Ruangan
+              </button>
+            </div>
             <select
               value={room}
               onChange={(e) => setRoom(e.target.value)}
@@ -288,6 +349,13 @@ export default function ReportForm() {
           </button>
         </div>
       </form>
+
+      <Modal open={scanOpen} onClose={() => { stopScan(); setScanOpen(false); }} title="Scan QR Ruangan">
+        <div className="space-y-3">
+          <video ref={videoRef} className="h-64 w-full rounded-xl bg-black object-cover" muted playsInline />
+          <p className="text-xs text-gray-500">Arahkan kamera ke QR yang ditempel di pintu ruangan. QR berisi link laporan dengan lokasi otomatis.</p>
+        </div>
+      </Modal>
     </div>
   );
 }

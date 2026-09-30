@@ -7,11 +7,14 @@ import AdminDashboard from './components/AdminDashboard';
 import ExportReport from './components/ExportReport';
 import QRGenerator from './components/QRGenerator';
 import UserManagement from './components/UserManagement';
+import Profile from './components/Profile';
 import Login from './components/Login';
+import Activate from './components/Activate';
 import AppLayout from './components/layout/AppLayout';
 import { ToastProvider } from './components/ui/Toast';
 import Spinner from './components/ui/Spinner';
 import ChatBot from './components/ChatBot';
+import { auth } from './api';
 import './App.css';
 
 function App() {
@@ -32,7 +35,8 @@ function App() {
     setLoading(false);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try { await auth.logout(); } catch {}
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
@@ -52,8 +56,10 @@ function App() {
       <Router>
         {!user ? (
           <Routes>
-            <Route path="/" element={<Login setUser={setUser} />} />
-            <Route path="*" element={<Navigate to="/" />} />
+            <Route path="/login" element={<Login setUser={setUser} />} />
+            <Route path="/aktivasi" element={<Activate setUser={setUser} />} />
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         ) : (
           <>
@@ -64,7 +70,9 @@ function App() {
                     <Route path="/" element={<Dashboard user={user} />} />
                     <Route path="/report/new" element={<ReportForm />} />
                     <Route path="/my-reports" element={<MyReports />} />
-                    <Route path="*" element={<Navigate to="/" />} />
+                    <Route path="/profile" element={<Profile user={user} setUser={setUser} />} />
+                    <Route path="/login" element={<Navigate to="/" replace />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
                   </>
                 ) : (
                   <>
@@ -72,7 +80,10 @@ function App() {
                     <Route path="/admin/export" element={<ExportReport />} />
                     <Route path="/admin/qr" element={<QRGenerator />} />
                     <Route path="/admin/users" element={<UserManagement currentUser={user} />} />
-                    <Route path="*" element={<Navigate to="/admin" />} />
+                    <Route path="/profile" element={<Profile user={user} setUser={setUser} />} />
+                    <Route path="/login" element={<Navigate to="/admin" replace />} />
+                    <Route path="/" element={<Navigate to="/admin" replace />} />
+                    <Route path="*" element={<Navigate to="/admin" replace />} />
                   </>
                 )}
               </Routes>

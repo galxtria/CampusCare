@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, Send, X, Loader } from 'lucide-react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { chat as chatAPI } from '../api';
 
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || '';
 
@@ -66,7 +67,8 @@ PENGETAHUAN RESMI CAMPUSCARE:
 6. LOKASI YANG DILAYANI (contoh): Lab Komputer 1, Lab Komputer 2, Ruang Kuliah 3.1, Ruang Kuliah 3.2, Ruang Sidang Utama, Toilet Lt. 1, Toilet Lt. 2, Kantin, Perpustakaan, dan seluruh area kampus.
 
 7. LAIN-LAIN:
-   - Belum punya akun / lupa password: hubungi admin sarpras kampus untuk bantuan (akun dibuat oleh admin, tidak ada registrasi mandiri).
+    - Akun mahasiswa berasal dari Sistem Akademik (nama, NIM, prodi, angkatan otomatis). Mahasiswa baru wajib AKTIVASI dulu di halaman Aktivasi: masukkan NIM (cek otomatis ke SIAKAD) lalu atur password CampusCare sendiri. NIM tidak terdaftar berarti hubungi bagian akademik, bukan admin sarpras.
+    - Setelah aktivasi, login dengan NIM dan password CampusCare. Data nama/NIM/prodi tidak bisa diubah sendiri; yang bisa diubah hanya password di Profil Saya.
    - Laporan bisa dihapus via tombol hapus di "Laporan Saya" (hapus permanen).
    - Setiap tiket bisa didiskusikan via kolom "Diskusi dengan teknisi" di halaman detail.
    - Setelah tiket Selesai, berikan rating bintang 1 sampai 5 + ulasan agar kualitas layanan terpantau.
@@ -111,12 +113,28 @@ export default function ChatBot() {
     setInput('');
     setLoading(true);
 
+    // 1) Coba via backend proxy (key aman di server).
+    try {
+      const hist = messages.filter((m) => m.sender === 'user' || m.sender === 'bot').slice(-10).map((m) => ({ role: m.sender === 'user' ? 'user' : 'model', text: m.text }));
+      const res = await chatAPI.send(userText, hist);
+      if (res.data?.reply) {
+        setMessages((prev) => [...prev, { id: prev.length + 1, text: res.data.reply, sender: 'bot', timestamp: new Date() }]);
+        setLoading(false);
+        return;
+      }
+    } catch (e) {
+      // backend belum dikonfigurasi -> fallback ke key frontend di bawah
+      if (e?.response?.status !== 503 && e?.response?.status !== 502 && e?.code !== 'ERR_NETWORK') {
+        // error lain tetap lanjut fallback
+      }
+    }
+
     if (!GEMINI_API_KEY || GEMINI_API_KEY.length < 20) {
       setMessages((prev) => [
         ...prev,
         {
           id: prev.length + 1,
-          text: 'API key Gemini belum dikonfigurasi. Isi REACT_APP_GEMINI_API_KEY di file .env.local dengan key valid (diawali AIza...), lalu restart npm start.',
+          text: 'Layanan AI belum dikonfigurasi. Isi GEMINI_API_KEY di backend .env (disarankan) atau REACT_APP_GEMINI_API_KEY di frontend .env.local, lalu restart.',
           sender: 'error',
           timestamp: new Date(),
         },
@@ -136,33 +154,47 @@ export default function ChatBot() {
           parts: [{ text: m.text }],
         }));
 
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      const isRetryable = (m) =>
+        /429|503|500|overload|high demand|rate|quota|exhausted|UNAVAILABLE|RESOURCE_EXHAUSTED|INTERNAL/i.test(m || '');
+
       let lastError = null;
       let botReply = '';
 
-      // Coba model utama, kalau 404 otomatis fallback ke model lain
+      // Coba model utama, kalau 404 otomatis fallback ke model lain.
+      // Error sesaat (sibuk/kuota) dicoba ulang sekali sebelum menyerah.
       for (const modelName of FALLBACK_MODELS) {
-        try {
-          // systemInstruction dipasang di getGenerativeModel (bukan di startChat)
-          const model = genAI.getGenerativeModel({
-            model: modelName,
-            systemInstruction: SYSTEM_PROMPT,
-          });
+        if (botReply) break;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            // systemInstruction dipasang di getGenerativeModel (bukan di startChat)
+            const model = genAI.getGenerativeModel({
+              model: modelName,
+              systemInstruction: SYSTEM_PROMPT,
+            });
 
-          const chat = model.startChat({
-            history,
-            generationConfig: { maxOutputTokens: 1024, temperature: 0.7 },
-          });
+            const chat = model.startChat({
+              history,
+              generationConfig: { maxOutputTokens: 1024, temperature: 0.7 },
+            });
 
-          const result = await chat.sendMessage(userText);
-          botReply = result.response.text();
-          break;
-        } catch (e) {
-          lastError = e;
-          const m = e?.message || '';
-          const isNotFound =
-            m.includes('404') || m.includes('not found') || m.includes('notFound') || m.includes('is not found');
-          if (!isNotFound) throw e; // error selain model-not-found langsung tampil
-          console.warn(`Model ${modelName} tidak tersedia, coba fallback...`);
+            const result = await chat.sendMessage(userText);
+            botReply = result.response.text();
+            break;
+          } catch (e) {
+            lastError = e;
+            const m = e?.message || '';
+            if (isRetryable(m) && attempt === 1) {
+              console.warn(`Model ${modelName} sibuk, coba ulang...`);
+              await sleep(2000);
+              continue;
+            }
+            const isNotFound =
+              m.includes('404') || m.includes('not found') || m.includes('notFound') || m.includes('is not found');
+            if (!isNotFound && !isRetryable(m)) throw e; // error permanen langsung tampil
+            console.warn(`Model ${modelName} gagal (${attempt}x), lanjut...`);
+            break;
+          }
         }
       }
 
@@ -185,9 +217,15 @@ export default function ChatBot() {
         friendly = 'API key Gemini tidak valid. Ganti REACT_APP_GEMINI_API_KEY di .env.local dengan key dari https://aistudio.google.com/apikey lalu restart npm start.';
       } else if (msg.includes('404') || msg.includes('not found') || msg.includes('notFound')) {
         friendly = `Semua model (${FALLBACK_MODELS.join(', ')}) tidak ditemukan. Coba REACT_APP_GEMINI_MODEL=gemini-3.5-flash-lite lalu restart npm start.`;
+      } else if (/429|quota|exhausted|RESOURCE_EXHAUSTED|rate/i.test(msg)) {
+        friendly = 'Batas pemakaian gratis Gemini tercapai. Tunggu sekitar 1 menit lalu coba lagi.';
+      } else if (/503|overload|high demand|UNAVAILABLE/i.test(msg)) {
+        friendly = 'Server Gemini sedang sibuk. Tunggu sebentar lalu coba lagi.';
       } else if (msg.includes('Failed to fetch') || msg.includes('Network')) {
-        friendly = 'Gagal terhubung ke Gemini. Periksa koneksi internet / VPN / adblock.';
+        friendly = 'Gagal terhubung ke Gemini. Periksa koneksi internet, matikan VPN/adblock untuk situs ini, lalu coba lagi.';
       }
+      const detail = msg ? msg.slice(0, 160) : 'tidak ada detail';
+      friendly += ` (Detail: ${detail})`;
       setMessages((prev) => [
         ...prev,
         {

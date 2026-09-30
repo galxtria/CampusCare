@@ -46,8 +46,11 @@ export default function MyReports() {
 
   useEffect(() => {
     tickets
-      .list()
-      .then((res) => setData(Array.isArray(res.data) ? res.data : []))
+      .listRaw()
+      .then((res) => {
+        const d = res.data;
+        setData(Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : []);
+      })
       .catch(() => toast.error('Gagal memuat laporan'))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -72,6 +75,11 @@ export default function MyReports() {
       return true;
     });
   }, [data, search, statusFilter, categoryFilter]);
+
+  const [page, setPage] = useState(1);
+  const PER_PAGE = 10;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const paged = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   const handleDelete = async () => {
     if (!pendingDelete) return;
@@ -181,7 +189,7 @@ export default function MyReports() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filtered.map((t) => (
+                {paged.map((t) => (
                   <tr key={t.id} className="transition hover:bg-gray-50/70">
                     <td className="px-5 py-3.5">
                       <p className="font-semibold text-gray-900">{t.location}</p>
@@ -220,6 +228,13 @@ export default function MyReports() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3">
+            <p className="text-xs text-gray-500">Halaman {page} dari {totalPages} · {filtered.length} laporan</p>
+            <div className="flex gap-2">
+              <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-40">Prev</button>
+              <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-40">Next</button>
+            </div>
           </div>
         </div>
       )}

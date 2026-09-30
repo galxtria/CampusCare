@@ -1,0 +1,14 @@
+[
+  { "nim": "2401010101", "nama": "Ayu Lestari", "prodi": "Teknik Informatika", "angkatan": "2024" },
+  { "nim": "2401010102", "nama": "Budi Santoso", "prodi": "Teknik Informatika", "angkatan": "2024" },
+  { "nim": "2401020103", "nama": "Citra Dewi", "prodi": "Sistem Informasi", "angkatan": "2024" },
+  { "nim": "2401020104", "nama": "Dedi Prasetyo", "prodi": "Sistem Informasi", "angkatan": "2024" },
+  { "nim": "2301010201", "nama": "Eka Putri", "prodi": "Teknik Informatika", "angkatan": "2023" },
+  { "nim": "2301030202", "nama": "Fajar Nugroho", "prodi": "Teknik Elektro", "angkatan": "2023" },
+  { "nim": "2301040203", "nama": "Gita Maharani", "prodi": "Manajemen", "angkatan": "2023" },
+  { "nim": "2201010301", "nama": "Hendra Gunawan", "prodi": "Teknik Informatika", "angkatan": "2022" },
+  { "nim": "2201020302", "nama": "Intan Permata", "prodi": "Sistem Informasi", "angkatan": "2022" },
+  { "nim": "2201050303", "nama": "Joko Susilo", "prodi": "Akuntansi", "angkatan": "2022" },
+  { "nim": "2101010401", "nama": "Kartika Sari", "prodi": "Teknik Informatika", "angkatan": "2021" },
+  { "nim": "2101030402", "nama": "Lukman Hakim", "prodi": "Teknik Elektro", "angkatan": "2021" }
+]

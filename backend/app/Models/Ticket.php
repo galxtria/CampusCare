@@ -9,13 +9,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Ticket extends Model
 {
     protected $fillable = [
-        'user_id', 'location', 'category', 'description',
-        'photo_path', 'status', 'urgency', 'admin_notes', 'priority'
+        'user_id', 'assigned_to', 'location', 'category', 'description',
+        'photo_path', 'photo_after_path', 'status', 'urgency', 'admin_notes', 'priority'
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
     }
 
     public function supports(): HasMany

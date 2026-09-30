@@ -30,9 +30,10 @@ export default function Dashboard({ user }) {
 
   useEffect(() => {
     tickets
-      .list()
+      .listRaw()
       .then((res) => {
-        const data = Array.isArray(res.data) ? res.data : [];
+        const d = res.data;
+        const data = Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : [];
         setStats({
           pending: data.filter((t) => t.status === 'pending').length,
           in_progress: data.filter((t) => t.status === 'in_progress').length,

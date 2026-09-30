@@ -8,6 +8,7 @@ import {
   LogOut,
   X,
   Users,
+  User,
 } from 'lucide-react';
 import Logo from '../ui/Logo';
 
@@ -15,6 +16,7 @@ const USER_NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/report/new', label: 'Laporkan Kerusakan', icon: FilePlus2 },
   { to: '/my-reports', label: 'Laporan Saya', icon: ClipboardList },
+  { to: '/profile', label: 'Profil Saya', icon: User },
 ];
 
 const ADMIN_NAV = [
@@ -22,6 +24,7 @@ const ADMIN_NAV = [
   { to: '/admin/export', label: 'Export Laporan', icon: FilePlus2 },
   { to: '/admin/qr', label: 'QR Code', icon: FilePlus2 },
   { to: '/admin/users', label: 'Kelola Pengguna', icon: Users },
+  { to: '/profile', label: 'Profil Saya', icon: User },
 ];
 
 function NavContent({ items, onNavigate }) {

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Menu } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Menu, User } from 'lucide-react';
 import Sidebar from './Sidebar';
+import NotificationBell from '../ui/NotificationBell';
 
 export default function AppLayout({ user, onLogout, children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -31,8 +33,12 @@ export default function AppLayout({ user, onLogout, children }) {
             >
               <Menu size={22} />
             </button>
-            <div className="ml-auto flex items-center gap-3">
+            <div className="ml-auto flex items-center gap-2">
               <span className="hidden text-sm text-gray-500 sm:block">{today}</span>
+              <NotificationBell />
+              <Link to="/profile" title="Profil saya" className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100">
+                <User size={20} />
+              </Link>
               <span className="hidden rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-600/20 sm:block">
                 {user?.role === 'admin' ? 'Admin Sarpras' : `NIM ${user?.nim_nip}`}
               </span>

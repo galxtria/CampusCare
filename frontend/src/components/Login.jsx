@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { CircleAlert, Eye, EyeOff, CircleCheck, LogIn } from 'lucide-react';
 import Logo from './ui/Logo';
 import { auth } from '../api';
@@ -15,6 +15,7 @@ export default function Login({ setUser }) {
   const [form, setForm] = useState({ nim_nip: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [needsActivation, setNeedsActivation] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -30,6 +31,7 @@ export default function Login({ setUser }) {
       return;
     }
     setError('');
+    setNeedsActivation('');
     setLoading(true);
 
     try {
@@ -40,6 +42,7 @@ export default function Login({ setUser }) {
       navigate(res.data.user.role === 'admin' ? '/admin' : '/');
     } catch (err) {
       setError(err.response?.data?.message || 'Login gagal, periksa koneksi ke server');
+      if (err.response?.data?.needs_activation) setNeedsActivation(form.nim_nip.trim());
     } finally {
       setLoading(false);
     }
@@ -91,7 +94,7 @@ export default function Login({ setUser }) {
           {error && (
             <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-red-50 p-3.5 text-sm font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
               <CircleAlert size={18} className="mt-0.5 shrink-0" />
-              {error}
+              <span>{error} {needsActivation && <Link to={`/aktivasi?nim=${encodeURIComponent(needsActivation)}`} className="font-bold underline">Aktivasi sekarang</Link>}</span>
             </div>
           )}
 
@@ -103,7 +106,7 @@ export default function Login({ setUser }) {
                 name="nim_nip"
                 value={form.nim_nip}
                 onChange={handleChange}
-                placeholder="Contoh: 2401010101"
+                placeholder="Masukan NIM/NIP"
                 autoComplete="username"
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/15"
               />
@@ -143,9 +146,9 @@ export default function Login({ setUser }) {
           </form>
 
           <p className="mt-6 text-center text-xs leading-relaxed text-gray-400">
-            Belum punya akun atau lupa password?
+            Mahasiswa baru? <Link to="/aktivasi" className="font-semibold text-red-600 hover:text-red-700">Aktivasi akun dengan NIM</Link>
             <br />
-            Hubungi admin sarpras kampus untuk bantuan.
+            Data mahasiswa berasal dari Sistem Akademik kampus.
           </p>
         </div>
       </div>

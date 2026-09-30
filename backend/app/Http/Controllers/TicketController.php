@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Notification;
 use App\Models\Ticket;
 use App\Models\TicketHistory;
 use App\Models\TicketSupport;
@@ -115,13 +116,55 @@ class TicketController extends Controller
 
         return $siblings->count();
     }
+    protected function notifyUser($userId, $ticketId, $title, $body = null): void
+    {
+        if (!$userId) return;
+        Notification::create([
+            'user_id' => $userId,
+            'ticket_id' => $ticketId,
+            'title' => $title,
+            'body' => $body,
+        ]);
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
-        if ($user->role === 'admin') {
-            return Ticket::with('user')->withCount('supports')->get();
+        $query = Ticket::with(['user', 'assignee:id,name'])->withCount('supports');
+
+        if ($user->role === 'teknisi') {
+            if ($request->get('scope') === 'all') {
+                if (!in_array($user->role, ['admin', 'teknisi'])) abort(403);
+            } else {
+                $mine = $request->get('assigned', 'mine');
+                if ($mine === 'mine') {
+                    $query->where('assigned_to', $user->id);
+                }
+            }
+        } elseif ($user->role !== 'admin') {
+            $query->where('user_id', $user->id);
         }
-        return $user->tickets()->withCount('supports')->get();
+
+        if ($request->filled('status')) $query->where('status', $request->get('status'));
+        if ($request->filled('category')) $query->where('category', $request->get('category'));
+        if ($request->filled('priority')) $query->where('priority', $request->get('priority'));
+        if ($request->filled('assigned_to')) $query->where('assigned_to', $request->get('assigned_to'));
+        if ($request->filled('search')) {
+            $q = $request->get('search');
+            $query->where(function ($w) use ($q) {
+                $w->where('location', 'like', "%{$q}%")
+                  ->orWhere('description', 'like', "%{$q}%")
+                  ->orWhere('category', 'like', "%{$q}%");
+            });
+        }
+        $query->orderByDesc('created_at');
+
+        if ($request->filled('page') || $request->filled('per_page') || $request->get('paginated') == '1') {
+            $perPage = min(max((int) $request->get('per_page', 10), 1), 100);
+            return $query->paginate($perPage);
+        }
+
+        return $query->get();
     }
 
     public function store(Request $request)
@@ -159,11 +202,12 @@ class TicketController extends Controller
 
     public function show(Request $request, $id)
     {
-        $ticket = Ticket::with(['user', 'histories.actor', 'comments.user'])
+        $ticket = Ticket::with(['user', 'assignee:id,name', 'histories.actor', 'comments.user'])
             ->withCount('supports')
             ->findOrFail($id);
         $user = $request->user();
-        if ($user->role !== 'admin' && $ticket->user_id !== $user->id) {
+        $isStaff = in_array($user->role, ['admin', 'teknisi']);
+        if (!$isStaff && $ticket->user_id !== $user->id) {
             return response()->json(['message' => 'Tidak berhak mengakses tiket ini'], 403);
         }
         return $ticket;
@@ -244,24 +288,25 @@ class TicketController extends Controller
         ]);
     }
 
-    /** Daftar komentar tiket (pemilik atau admin). */
+    /** Daftar komentar tiket (pemilik, teknisi terkait, atau admin). */
     public function comments(Request $request, $id)
     {
         $ticket = Ticket::findOrFail($id);
         $user = $request->user();
-        if ($user->role !== 'admin' && $ticket->user_id !== $user->id) {
+        if (!in_array($user->role, ['admin', 'teknisi']) && $ticket->user_id !== $user->id) {
             return response()->json(['message' => 'Tidak berhak melihat komentar ini'], 403);
         }
 
         return $ticket->comments()->with('user:id,name,role')->get();
     }
 
-    /** Tambah komentar ke tiket (pemilik atau admin). */
+    /** Tambah komentar ke tiket (pemilik, teknisi terkait, atau admin). */
     public function addComment(Request $request, $id)
     {
         $ticket = Ticket::findOrFail($id);
         $user = $request->user();
-        if ($user->role !== 'admin' && $ticket->user_id !== $user->id) {
+        $canComment = in_array($user->role, ['admin']) || $ticket->user_id === $user->id || $ticket->assigned_to === $user->id;
+        if (!$canComment) {
             return response()->json(['message' => 'Tidak berhak berkomentar di tiket ini'], 403);
         }
 
@@ -273,6 +318,10 @@ class TicketController extends Controller
             'user_id' => $user->id,
             'body' => $validated['body'],
         ]);
+
+        if ($ticket->user_id !== $user->id) {
+            $this->notifyUser($ticket->user_id, $ticket->id, 'Komentar baru di laporan Anda', mb_substr($validated['body'], 0, 120));
+        }
 
         return response()->json($comment->load('user:id,name,role'), 201);
     }
@@ -309,7 +358,7 @@ class TicketController extends Controller
      */
     public function stats(Request $request)
     {
-        if ($request->user()->role !== 'admin') {
+        if (!in_array($request->user()->role, ['admin', 'teknisi'])) {
             return response()->json(['message' => 'Hanya admin'], 403);
         }
 
@@ -374,9 +423,10 @@ class TicketController extends Controller
             'status' => 'sometimes|in:pending,in_progress,resolved',
             'admin_notes' => 'nullable|string',
             'priority' => 'sometimes|in:ringan,mendesak,darurat',
+            'assigned_to' => 'nullable|integer|exists:users,id',
         ]);
 
-        $changes = collect($validated)->only(['status', 'admin_notes', 'priority'])->toArray();
+        $changes = collect($validated)->only(['status', 'admin_notes', 'priority', 'assigned_to'])->toArray();
         if (empty($changes)) {
             return response()->json(['message' => 'Tidak ada perubahan yang diminta'], 422);
         }
@@ -413,17 +463,36 @@ class TicketController extends Controller
     {
         $ticket = Ticket::findOrFail($id);
         $user = $request->user();
-        if ($user->role !== 'admin' && $ticket->user_id !== $user->id) {
+        $isAdmin = $user->role === 'admin';
+        $isAssignee = $ticket->assigned_to === $user->id;
+        if (!$isAdmin && !$isAssignee && $ticket->user_id !== $user->id) {
             return response()->json(['message' => 'Tidak berhak mengubah tiket ini'], 403);
+        }
+        // Pemilik hanya boleh memberi rating via endpoint khusus, bukan ubah status.
+        if (!$isAdmin && !$isAssignee) {
+            return response()->json(['message' => 'Hanya petugas yang bisa mengubah tiket'], 403);
         }
         $validated = $request->validate([
             'status' => 'sometimes|in:pending,in_progress,resolved',
             'admin_notes' => 'nullable|string',
             'priority' => 'sometimes|in:ringan,mendesak,darurat',
+            'assigned_to' => 'nullable|integer|exists:users,id',
+            'photo_after' => 'nullable|image|max:5120',
         ]);
 
+        if (array_key_exists('assigned_to', $validated) && !$isAdmin) {
+            unset($validated['assigned_to']);
+        }
+
+        if ($request->hasFile('photo_after')) {
+            $validated['photo_after_path'] = $request->file('photo_after')->store('tickets/after', 'public');
+        }
+        unset($validated['photo_after']);
+
         $oldStatus = $ticket->status;
+        $oldAssignee = $ticket->assigned_to;
         $ticket->update($validated);
+        $ticket->refresh();
 
         if (($validated['status'] ?? null) && $validated['status'] !== $oldStatus) {
             $this->logHistory(
@@ -442,13 +511,20 @@ class TicketController extends Controller
                 $validated['admin_notes'] ?? null
             );
 
+            $label = ['pending' => 'Menunggu', 'in_progress' => 'Diproses', 'resolved' => 'Selesai'][$validated['status']] ?? $validated['status'];
+            $this->notifyUser($ticket->user_id, $ticket->id, "Laporan {$ticket->location}: {$label}", $ticket->admin_notes);
+
             return response()->json(array_merge(
-                $ticket->toArray(),
+                $ticket->load(['assignee:id,name'])->toArray(),
                 ['auto_followed' => $followed]
             ));
         }
 
-        return response()->json($ticket);
+        if (array_key_exists('assigned_to', $validated) && $validated['assigned_to'] != $oldAssignee && $ticket->assigned_to) {
+            $this->notifyUser($ticket->assigned_to, $ticket->id, 'Tiket baru ditugaskan ke Anda', "{$ticket->location} · {$ticket->category}");
+        }
+
+        return response()->json($ticket->load(['assignee:id,name']));
     }
 
     public function destroy(Request $request, $id)

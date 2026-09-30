@@ -62,6 +62,32 @@ export const generateQRCode = async (text) => {
   }
 };
 
+/** Kompres gambar ke max 1280px JPEG 0.8 agar upload ringan. Return File. */
+export const compressImage = (file, maxDim = 1280, quality = 0.8) =>
+  new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let { width, height } = img;
+      const scale = Math.min(1, maxDim / Math.max(width, height));
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => {
+        if (!blob) return resolve(file);
+        resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }));
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+
+export const reportLinkForRoom = (room) =>
+  `${window.location.origin}/report/new?room=${encodeURIComponent(room)}`;
+
 export const exportPDF = (html, filename) => {
   const element = document.createElement('div');
   element.innerHTML = html;
