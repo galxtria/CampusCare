@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
 import ReportForm from './components/ReportForm';
 import MyReports from './components/MyReports';
@@ -16,6 +16,14 @@ import Spinner from './components/ui/Spinner';
 import ChatBot from './components/ChatBot';
 import { auth } from './api';
 import './App.css';
+
+/** Menampung ruangan dari QR bila pemindai belum login, lalu lempar ke login. */
+function QRRedirect() {
+  const [params] = useSearchParams();
+  const room = params.get('room');
+  if (room) localStorage.setItem('pendingRoom', room);
+  return <Navigate to="/login" replace />;
+}
 
 function App() {
   const [user, setUser] = useState(null);
@@ -58,6 +66,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login setUser={setUser} />} />
             <Route path="/aktivasi" element={<Activate setUser={setUser} />} />
+            <Route path="/report/new" element={<QRRedirect />} />
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>

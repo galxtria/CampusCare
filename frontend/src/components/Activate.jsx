@@ -54,7 +54,9 @@ export default function Activate({ setUser }) {
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
       setUser(res.data.user);
-      navigate('/');
+      const pending = localStorage.getItem('pendingRoom');
+      localStorage.removeItem('pendingRoom');
+      navigate(pending ? `/report/new?room=${encodeURIComponent(pending)}` : '/');
     } catch (err) {
       setError(err.response?.data?.message || 'Aktivasi gagal');
     } finally {

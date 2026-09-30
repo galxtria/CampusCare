@@ -29,8 +29,9 @@ export default function ReportForm() {
   const scanTimer = useRef(null);
 
   useEffect(() => {
-    const roomParam = searchParams.get('room');
+    const roomParam = searchParams.get('room') || localStorage.getItem('pendingRoom');
     if (roomParam) {
+      localStorage.removeItem('pendingRoom');
       const match = ROOMS.find((r) => r.toLowerCase() === roomParam.toLowerCase());
       if (match) setRoom(match);
       else { setRoom(OTHER_LOCATION); setForm((p) => ({ ...p, location: roomParam })); }

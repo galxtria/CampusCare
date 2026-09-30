@@ -39,7 +39,9 @@ export default function Login({ setUser }) {
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
       setUser(res.data.user);
-      navigate(res.data.user.role === 'admin' ? '/admin' : '/');
+      const pending = localStorage.getItem('pendingRoom');
+      localStorage.removeItem('pendingRoom');
+      navigate(pending ? `/report/new?room=${encodeURIComponent(pending)}` : res.data.user.role === 'admin' ? '/admin' : '/');
     } catch (err) {
       setError(err.response?.data?.message || 'Login gagal, periksa koneksi ke server');
       if (err.response?.data?.needs_activation) setNeedsActivation(form.nim_nip.trim());
