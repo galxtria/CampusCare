@@ -12,6 +12,7 @@ import {
 import { tickets } from '../api';
 import { CATEGORIES, STORAGE_URL, formatDate, isSameCategory } from '../constants';
 import { isDuplicateReport } from '../utils/helpers';
+import useAutoRefresh, { formatTime } from '../hooks/useAutoRefresh';
 import { useToast } from './ui/Toast';
 import PageHeader from './ui/PageHeader';
 import StatCard from './ui/StatCard';
@@ -82,24 +83,21 @@ export default function AdminDashboard() {
   const [bulkNotes, setBulkNotes] = useState('');
   const [bulkApplying, setBulkApplying] = useState(false);
 
-  const loadTickets = async () => {
-    try {
-      const res = await tickets.listRaw();
-      const d = res.data;
-      const arr = Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : [];
-      setAllTickets(arr);
-    } catch {
+  // Tiket + statistik diambil paralel (bukan berurutan) agar halaman lebih cepat tampil.
+  const loadTickets = async (silent) => {
+    const [tRes, sRes] = await Promise.allSettled([tickets.listRaw(), tickets.stats()]);
+    if (tRes.status === 'fulfilled') {
+      const d = tRes.value.data;
+      setAllTickets(Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : []);
+    } else if (!silent) {
       toast.error('Gagal memuat data tiket');
-    } finally {
-      setLoading(false);
     }
+    if (sRes.status === 'fulfilled') setInsight(sRes.value.data);
+    if (!silent) setLoading(false);
+    if (tRes.status === 'rejected' && silent) throw new Error('poll fail');
   };
 
-  useEffect(() => {
-    loadTickets();
-    tickets.stats().then((res) => setInsight(res.data)).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const updatedAt = useAutoRefresh((silent) => loadTickets(silent), 20000);
 
   const openDetail = async (ticket) => {
     setSelected(ticket);
@@ -215,7 +213,7 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <PageHeader title="Kelola Tiket" subtitle="Tinjau laporan masuk dan kelola status pengerjaannya" />
+      <PageHeader title="Kelola Tiket" subtitle={`Tinjau laporan masuk dan kelola status pengerjaannya · Live ${formatTime(updatedAt)}`} />
 
       <div className="mb-6 grid grid-cols-2 gap-4 xl:grid-cols-4">
         <StatCard label="Total Laporan" value={stats.total} icon={ClipboardList} tone="slate" sub="Semua tiket masuk" />
@@ -353,8 +351,8 @@ export default function AdminDashboard() {
               <div className="rounded-xl bg-gray-50 p-4"><p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Deskripsi</p><p className="text-sm leading-relaxed text-gray-800">{selected.description}</p></div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              {selected.photo_path && <div><p className="mb-1 text-xs font-semibold text-gray-500">Foto SEBELUM</p><img src={`${STORAGE_URL}/${selected.photo_path}`} alt="Sebelum" className="max-h-64 w-full rounded-xl border object-cover" /></div>}
-              {selected.photo_after_path && <div><p className="mb-1 text-xs font-semibold text-gray-500">Foto SESUDAH</p><img src={`${STORAGE_URL}/${selected.photo_after_path}`} alt="Sesudah" className="max-h-64 w-full rounded-xl border object-cover" /></div>}
+              {selected.photo_path && <div><p className="mb-1 text-xs font-semibold text-gray-500">Foto SEBELUM</p><img src={`${STORAGE_URL}/${selected.photo_path}`} alt="Sebelum" loading="lazy" className="max-h-64 w-full rounded-xl border object-cover" /></div>}
+              {selected.photo_after_path && <div><p className="mb-1 text-xs font-semibold text-gray-500">Foto SESUDAH</p><img src={`${STORAGE_URL}/${selected.photo_after_path}`} alt="Sesudah" loading="lazy" className="max-h-64 w-full rounded-xl border object-cover" /></div>}
             </div>
             <div>
               <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-700"><Wrench size={16} className="text-gray-400" />Ubah status pengerjaan</p>

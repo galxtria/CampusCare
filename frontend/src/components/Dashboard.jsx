@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CircleAlert,
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { tickets } from '../api';
 import { formatDate } from '../constants';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 import { useToast } from './ui/Toast';
 import StatCard from './ui/StatCard';
 import StatusBadge from './ui/StatusBadge';
@@ -28,32 +29,29 @@ export default function Dashboard({ user }) {
   const [supporting, setSupporting] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    tickets
-      .listRaw()
-      .then((res) => {
-        const d = res.data;
-        const data = Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : [];
-        setStats({
-          pending: data.filter((t) => t.status === 'pending').length,
-          in_progress: data.filter((t) => t.status === 'in_progress').length,
-          resolved: data.filter((t) => t.status === 'resolved').length,
-        });
-        setRecent(
-          [...data]
-            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-            .slice(0, 5)
-        );
-      })
-      .catch(() => toast.error('Gagal memuat data dashboard'))
-      .finally(() => setLoading(false));
-
-    tickets
-      .active()
-      .then((res) => setReported(Array.isArray(res.data) ? res.data.slice(0, 6) : []))
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const firstRun = useRef(true);
+  useAutoRefresh(async (silent) => {
+    try {
+      const res = await tickets.listRaw();
+      const d = res.data;
+      const data = Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : [];
+      setStats({
+        pending: data.filter((t) => t.status === 'pending').length,
+        in_progress: data.filter((t) => t.status === 'in_progress').length,
+        resolved: data.filter((t) => t.status === 'resolved').length,
+      });
+      setRecent([...data].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5));
+      const r2 = await tickets.active();
+      setReported(Array.isArray(r2.data) ? r2.data.slice(0, 6) : []);
+    } catch {
+      if (!silent) toast.error('Gagal memuat data dashboard');
+    } finally {
+      if (firstRun.current) {
+        firstRun.current = false;
+        setLoading(false);
+      }
+    }
+  }, 30000);
 
   const handleSupport = async (id) => {
     setSupporting(id);

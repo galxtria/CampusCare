@@ -162,7 +162,10 @@ class TicketController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Ticket::with(['user', 'assignee:id,name'])->withCount('supports');
+        // Kolom daftar dibatasi agar payload ringan; detail lengkap via show().
+        $query = Ticket::select(['id', 'user_id', 'assigned_to', 'location', 'category', 'description', 'photo_path', 'photo_after_path', 'status', 'priority', 'priority_reason', 'rating', 'created_at', 'updated_at'])
+            ->with(['user:id,name,nim_nip,prodi,angkatan', 'assignee:id,name'])
+            ->withCount('supports');
 
         if ($user->role === 'teknisi') {
             if ($request->get('scope') === 'all') {

@@ -101,18 +101,28 @@ export default function ExportReport() {
     }, 100);
   };
 
-  const handleExportCSV = () => {
-    const header = ['ID', 'Lokasi', 'Kategori', 'Status', 'Prioritas', 'Tanggal', 'Pelapor', 'NIM', 'Deskripsi'];
-    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const lines = [header.map(esc).join(';')];
-    filtered.forEach((t) => lines.push([t.id, t.location, t.category, t.status, t.priority, t.created_at, t.user?.name, t.user?.nim_nip, t.description].map(esc).join(';')));
-    const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const escHTML = (v) => String(v ?? '-').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const handleExportExcel = () => {
+    const th = 'background:#991b1b;color:#fff;font-weight:bold;border:1px solid #7f1d1d;padding:8px;';
+    const td = 'border:1px solid #999;padding:8px;';
+    const head = `<tr><td colspan="7" style="font-size:18px;font-weight:bold;text-align:center;">CAMPUSCARE - REKAP LAPORAN FASILITAS KAMPUS</td></tr>
+      <tr><td colspan="7" style="text-align:center;">Tim Sarana &amp; Prasarana · Periode: ${escHTML(periodLabel)} · Dicetak ${escHTML(new Date().toLocaleDateString('id-ID'))}</td></tr>
+      <tr><td colspan="7"></td></tr>
+      <tr><td style="${th}">Total</td><td style="${td}">${stats.total}</td><td style="${th}">Menunggu</td><td style="${td}">${stats.pending}</td><td style="${th}">Diproses</td><td style="${td}">${stats.in_progress}</td></tr>
+      <tr><td style="${th}">Selesai</td><td style="${td}" colspan="5">${stats.resolved}</td></tr>
+      <tr><td colspan="7"></td></tr>`;
+    const cols = ['ID', 'Lokasi', 'Kategori', 'Status', 'Prioritas', 'Tanggal', 'Pelapor'];
+    const rows = filtered.map((t) => `<tr>${[t.id, t.location, t.category, STATUS_LABELS[t.status] || t.status, t.priority || '-', formatDate(t.created_at), t.user?.name || 'Tanpa nama'].map((v) => `<td style="${td}">${escHTML(v)}</td>`).join('')}</tr>`).join('');
+    const sign = `<tr><td colspan="7"></td></tr><tr><td colspan="7"></td></tr><tr><td colspan="4"></td><td colspan="3" style="text-align:center;">Mengetahui,<br/><br/><br/><br/><b><u>${escHTML(signer)}</u></b><br/>NIP. ............................</td></tr>`;
+    const html = `<html><head><meta charset="UTF-8" /></head><body><table border="1" cellspacing="0" cellpadding="4">${head}<tr>${cols.map((c) => `<td style="${th}">${c}</td>`).join('')}</tr>${rows}${sign}</table></body></html>`;
+    const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `campuscare-${period}-${Date.now()}.csv`;
+    a.download = `campuscare-${period}-${Date.now()}.xls`;
     a.click();
     URL.revokeObjectURL(a.href);
-    toast.success('CSV berhasil diunduh (bisa dibuka di Excel)');
+    toast.success('File Excel berhasil diunduh');
   };
 
   if (loading) return <div className="flex items-center justify-center gap-2 py-20 text-gray-500"><Spinner size={24} /><span className="text-sm font-medium">Memuat data...</span></div>;
@@ -156,8 +166,8 @@ export default function ExportReport() {
             <button onClick={handleExportPDF} disabled={exporting || stats.total === 0} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-60">
               {exporting ? <Spinner size={18} /> : <Download size={18} />} PDF + Kop
             </button>
-            <button onClick={handleExportCSV} disabled={stats.total === 0} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-gray-300 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-60">
-              <FileSpreadsheet size={18} /> CSV / Excel
+            <button onClick={handleExportExcel} disabled={stats.total === 0} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-gray-300 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-60">
+              <FileSpreadsheet size={18} /> Excel
             </button>
           </div>
         </div>

@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Plus, Trash2, Eye, MapPin } from 'lucide-react';
 import { tickets } from '../api';
 import { CATEGORIES, STORAGE_URL, formatDate, isSameCategory } from '../constants';
+import useAutoRefresh, { formatTime } from '../hooks/useAutoRefresh';
 import { useToast } from './ui/Toast';
 import PageHeader from './ui/PageHeader';
 import StatusBadge from './ui/StatusBadge';
@@ -43,17 +44,21 @@ export default function MyReports() {
     }
   };
 
-  useEffect(() => {
-    tickets
-      .listRaw()
-      .then((res) => {
-        const d = res.data;
-        setData(Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : []);
-      })
-      .catch(() => toast.error('Gagal memuat laporan'))
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const firstRun = useRef(true);
+  const updatedAt = useAutoRefresh(async (silent) => {
+    try {
+      const res = await tickets.listRaw();
+      const d = res.data;
+      setData(Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : []);
+    } catch {
+      if (!silent) toast.error('Gagal memuat laporan');
+    } finally {
+      if (firstRun.current) {
+        firstRun.current = false;
+        setLoading(false);
+      }
+    }
+  }, 30000);
 
   const counts = useMemo(
     () => ({
@@ -108,7 +113,7 @@ export default function MyReports() {
     <div>
       <PageHeader
         title="Laporan Saya"
-        subtitle="Pantau perkembangan setiap laporan yang kamu kirim"
+        subtitle={`Pantau perkembangan setiap laporan yang kamu kirim · Live ${formatTime(updatedAt)}`}
         action={
           <Link
             to="/report/new"
@@ -268,6 +273,7 @@ export default function MyReports() {
               <img
                 src={`${STORAGE_URL}/${selected.photo_path}`}
                 alt="Bukti kerusakan"
+                loading="lazy"
                 className="max-h-80 w-full rounded-xl border border-gray-200 object-cover"
               />
             )}
