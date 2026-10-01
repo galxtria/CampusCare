@@ -10,8 +10,6 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\RoomController;
 
 Route::post('/login', [AuthController::class, 'login']);
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/check-nim', [AuthController::class, 'checkNim']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {

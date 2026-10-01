@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CircleAlert, Eye, EyeOff, CircleCheck, LogIn } from 'lucide-react';
 import Logo from './ui/Logo';
 import { auth } from '../api';
@@ -15,7 +15,6 @@ export default function Login({ setUser }) {
   const [form, setForm] = useState({ nim_nip: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [needsActivation, setNeedsActivation] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -38,7 +37,6 @@ export default function Login({ setUser }) {
       return;
     }
     setError('');
-    setNeedsActivation('');
     setLoading(true);
 
     try {
@@ -51,7 +49,6 @@ export default function Login({ setUser }) {
       navigate(pending ? `/report/new?room=${encodeURIComponent(pending)}` : res.data.user.role === 'admin' ? '/admin' : '/');
     } catch (err) {
       setError(err.response?.data?.message || 'Login gagal, periksa koneksi ke server');
-      if (err.response?.data?.needs_activation) setNeedsActivation(form.nim_nip.trim());
     } finally {
       setLoading(false);
     }
@@ -103,7 +100,7 @@ export default function Login({ setUser }) {
           {error && (
             <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-red-50 p-3.5 text-sm font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
               <CircleAlert size={18} className="mt-0.5 shrink-0" />
-              <span>{error} {needsActivation && <Link to={`/aktivasi?nim=${encodeURIComponent(needsActivation)}${roomParam ? `&room=${encodeURIComponent(roomParam)}` : ''}`} className="font-bold underline">Aktivasi sekarang</Link>}</span>
+              <span>{error}</span>
             </div>
           )}
 
@@ -155,9 +152,7 @@ export default function Login({ setUser }) {
           </form>
 
           <p className="mt-6 text-center text-xs leading-relaxed text-gray-400">
-            Mahasiswa baru? <Link to={roomParam ? `/aktivasi?room=${encodeURIComponent(roomParam)}` : '/aktivasi'} className="font-semibold text-red-600 hover:text-red-700">Aktivasi akun dengan NIM</Link>
-            <br />
-            Data mahasiswa berasal dari Sistem Akademik kampus.
+            Belum punya akun? Hubungi admin sarpras kampus.
           </p>
         </div>
       </div>

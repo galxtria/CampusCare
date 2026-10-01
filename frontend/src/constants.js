@@ -1,4 +1,15 @@
-export const API_BASE_URL = 'http://localhost:8001';
+/** Base URL backend. Otomatis ikut hostname agar bisa dibuka dari HP via IP LAN.
+ *  Bisa di-override via REACT_APP_API_URL (lihat frontend/.env.local).
+ *  - buka via localhost      -> http://localhost:8001
+ *  - buka via 192.168.x.x    -> http://192.168.x.x:8001 */
+export const API_BASE_URL =
+  process.env.REACT_APP_API_URL ||
+  (typeof window !== 'undefined' &&
+  window.location.hostname &&
+  window.location.hostname !== 'localhost' &&
+  window.location.hostname !== '127.0.0.1'
+    ? `http://${window.location.hostname}:8001`
+    : 'http://localhost:8001');
 
 export const STORAGE_URL = `${API_BASE_URL}/storage`;
 

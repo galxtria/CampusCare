@@ -10,7 +10,6 @@ import QRGenerator from './components/QRGenerator';
 import UserManagement from './components/UserManagement';
 import Profile from './components/Profile';
 import Login from './components/Login';
-import Activate from './components/Activate';
 import AppLayout from './components/layout/AppLayout';
 import { ToastProvider } from './components/ui/Toast';
 import Spinner from './components/ui/Spinner';
@@ -66,7 +65,6 @@ function App() {
         {!user ? (
           <Routes>
             <Route path="/login" element={<Login setUser={setUser} />} />
-            <Route path="/aktivasi" element={<Activate setUser={setUser} />} />
             <Route path="/report/new" element={<QRRedirect />} />
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="*" element={<Navigate to="/login" replace />} />

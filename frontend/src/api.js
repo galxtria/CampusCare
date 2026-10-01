@@ -32,8 +32,6 @@ export const auth = {
   me: () => API.get('/me'),
   updateProfile: (data) => API.put('/profile', data),
   changePassword: (data) => API.put('/change-password', data),
-  register: (data) => API.post('/register', data),
-  checkNim: (nim_nip) => API.post('/check-nim', { nim_nip }),
 };
 
 const unwrapList = (res) => {

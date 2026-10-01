@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Services\SiakadService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -18,65 +17,11 @@ class AuthController extends Controller
 
         $user = User::where('nim_nip', $validated['nim_nip'])->first();
         if (!$user || !Hash::check($validated['password'], $user->password)) {
-            // Prototype SIAKAD: bedakan NIM terdaftar tapi belum aktivasi.
-            if (!$user && SiakadService::findByNim($validated['nim_nip'])) {
-                return response()->json([
-                    'message' => 'Akun belum diaktivasi. Silakan aktivasi dengan NIM Anda terlebih dahulu.',
-                    'needs_activation' => true,
-                ], 404);
-            }
             return response()->json(['message' => 'NIM/Password salah'], 401);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
         return response()->json(['token' => $token, 'user' => $user]);
-    }
-
-    /**
-     * Aktivasi akun mahasiswa (prototype SIAKAD).
-     * NIM + nama + prodi + angkatan ditarik dari Sistem Akademik,
-     * mahasiswa hanya mengatur password CampusCare-nya sendiri.
-     */
-    public function register(Request $request)
-    {
-        $validated = $request->validate([
-            'nim_nip' => 'required|string|max:50',
-            'password' => 'required|string|min:6|confirmed',
-        ]);
-
-        if (User::where('nim_nip', $validated['nim_nip'])->exists()) {
-            return response()->json(['message' => 'NIM ini sudah memiliki akun. Silakan login.'], 422);
-        }
-
-        $mhs = SiakadService::findByNim($validated['nim_nip']);
-        if (!$mhs) {
-            return response()->json(['message' => 'NIM tidak terdaftar di Sistem Akademik kampus'], 404);
-        }
-
-        $user = User::create([
-            'name' => $mhs['nama'],
-            'nim_nip' => $mhs['nim'],
-            'email' => $mhs['nim'] . '@campuscare.local',
-            'password' => Hash::make($validated['password']),
-            'role' => 'user',
-            'prodi' => $mhs['prodi'],
-            'angkatan' => $mhs['angkatan'],
-        ]);
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-        return response()->json(['token' => $token, 'user' => $user], 201);
-    }
-
-    /** Cek data SIAKAD berdasarkan NIM (untuk pratinjau form aktivasi). */
-    public function checkNim(Request $request)
-    {
-        $request->validate(['nim_nip' => 'required|string|max:50']);
-        $mhs = SiakadService::findByNim($request->get('nim_nip'));
-        if (!$mhs) {
-            return response()->json(['message' => 'NIM tidak terdaftar di Sistem Akademik kampus'], 404);
-        }
-        $activated = User::where('nim_nip', $mhs['nim'])->exists();
-        return response()->json(array_merge($mhs, ['activated' => $activated]));
     }
 
     public function logout(Request $request)
